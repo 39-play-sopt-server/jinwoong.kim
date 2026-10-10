@@ -1,4 +1,9 @@
 package org.sopt;
 
-public class CreatePostRequest {
+public record CreatePostRequest (
+    String title,
+    String content,
+    Category category
+) {
+
 }

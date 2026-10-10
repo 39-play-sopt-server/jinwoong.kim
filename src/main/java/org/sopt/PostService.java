@@ -1,7 +1,10 @@
-package org.sopt.week1.POST;
+package org.sopt;
+
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Service
 public class PostService {
     private final PostRepository repo;
     // 심화: 게시글 ID 생성기

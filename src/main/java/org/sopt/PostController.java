@@ -1,7 +1,11 @@
-package org.sopt.week1.POST;
+package org.sopt;
+
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RestController
+@RequestMapping("/api/v1/posts")
 public class PostController {
 
     // 심화 view 없애기
@@ -45,13 +49,10 @@ public class PostController {
 
     // METHODS -----------------
     // METHOD: 게시글 작성
-    public Response<Void> createPost(
-            String title,
-            String content,
-            Category category
-    ) {
+    @PostMapping
+    public Response<Void> createPost(@RequestBody CreatePostRequest request) {
         try {
-            service.createPost(title, content, category);
+            service.createPost(request.title(), request.content(), request.category());
             return Response.success("게시글이 작성되었습니다.", null);
         } catch (IllegalArgumentException exc) {
             return Response.failure(exc.getMessage());
@@ -60,6 +61,7 @@ public class PostController {
 
     // 심화 view 없애기
     // METHOD: 게시글 목록 조회
+    @GetMapping
     public Response<List<Post>> readPostList() {
         return Response.success(
                 "게시글 목록을 조회했습니다.",
@@ -69,7 +71,8 @@ public class PostController {
 
     // 심화 view 없애기
     // METHOD: ID로 게시글 단건 조회
-    public Response<Post> readPost(long id){
+    @GetMapping("/{postId}")
+    public Response<Post> readPost(@PathVariable("postId") long id){
         try {
             return Response.success(
                     "게시글을 조회했습니다.",
@@ -83,13 +86,13 @@ public class PostController {
     // 심화 view 없애기
     // METHOD: 게시글 수정
     // 입력하지 않은 항목은 기존 값을 유지합니다.
+    @PutMapping("/{postId}")
     public Response<Void> updatePost(
-            long id,
-            String title,
-            String content
+            @PathVariable("postId") long id,
+            @RequestBody UpdatePostRequest request
     ) {
         try {
-           service.updatePost(id, title, content);
+           service.updatePost(id, request.title(), request.content());
            return Response.success("ID:"+ id + "게시글이 수정되었습니다.", null);
         } catch (IllegalArgumentException exc) {
             return Response.failure(exc.getMessage());
@@ -97,7 +100,8 @@ public class PostController {
     }
 
     // METHOD: ID로 게시글 삭제
-    public Response<Void> deletePost(long id) {
+    @DeleteMapping("/{postId}")
+    public Response<Void> deletePost(@PathVariable("postId") long id) {
         try {
             service.deletePost(id);
             return Response.success("ID:"+ id + "게시글이 삭제되었습니다.", null);

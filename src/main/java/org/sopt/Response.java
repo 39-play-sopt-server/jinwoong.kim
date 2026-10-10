@@ -1,4 +1,4 @@
-package org.sopt.week1.POST;
+package org.sopt;
 
 // 심화: 서버의 성공·실패 결과를 동일한 구조로 전달합니다.
 public class Response<T> {

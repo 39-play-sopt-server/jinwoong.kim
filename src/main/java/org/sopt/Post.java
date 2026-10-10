@@ -1,4 +1,4 @@
-package org.sopt.week1.POST;
+package org.sopt;
 
 // 게시글 작성 시각에 사용합니다.
 import java.time.LocalDateTime;

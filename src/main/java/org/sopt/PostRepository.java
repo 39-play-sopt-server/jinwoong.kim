@@ -1,4 +1,6 @@
-package org.sopt.week1.POST;
+package org.sopt;
+
+import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +10,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
+@Repository
 public class PostRepository {
     // 심화: ID를 key로 사용하는 HashMap 저장소
     private final Map<Long, Post> posts = new HashMap<>();

@@ -1,4 +1,8 @@
 package org.sopt;
 
-public class UpdatePostRequest {
+public record UpdatePostRequest (
+    String title,
+    String content
+) {
+
 }
