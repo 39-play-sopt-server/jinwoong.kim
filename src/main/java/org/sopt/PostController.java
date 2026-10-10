@@ -1,5 +1,7 @@
 package org.sopt;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -101,12 +103,14 @@ public class PostController {
 
     // METHOD: ID로 게시글 삭제
     @DeleteMapping("/{postId}")
-    public Response<Void> deletePost(@PathVariable("postId") long id) {
+    public ResponseEntity<Response<Void>> deletePost(@PathVariable("postId") long id) {
         try {
             service.deletePost(id);
-            return Response.success("ID:"+ id + "게시글이 삭제되었습니다.", null);
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(Response.success("ID:" + id + " 게시글이 삭제되었습니다.", null));
         } catch (IllegalArgumentException exc) {
-            return Response.failure(exc.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Response.failure(exc.getMessage()));
         }
     }
 }
