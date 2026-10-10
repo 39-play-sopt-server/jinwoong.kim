@@ -1,4 +1,4 @@
-package org.sopt.week1.POST;
+package org.sopt;
 
 public enum Category {
     GENERAL,
