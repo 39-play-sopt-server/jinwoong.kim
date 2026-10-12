@@ -61,11 +61,14 @@ public class Post {
 
     // METHOD: 제목과 본문을 모두 검증한 뒤 함께 수정합니다.
     public void update(String title, String content) {
-        validateTitle(title);
-        validateContent(content);
+        String updatedTitle = (title == null || title.isBlank()) ? this.title : title;
+        String updatedContent = (content == null || content.isBlank()) ? this.content : content;
 
-        this.title = title;
-        this.content = content;
+        validateTitle(updatedTitle);
+        validateContent(updatedContent);
+
+        this.title = updatedTitle;
+        this.content = updatedContent;
     }
 
     // 입력값 검증
