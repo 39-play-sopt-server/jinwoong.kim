@@ -1,19 +1,23 @@
 package org.sopt.post.domain;
 
-// 게시글 작성 시각에 사용합니다.
 import java.time.LocalDateTime;
 
+/**
+ * CLASS: 게시글의 상태와 생성·수정 시 지켜야 하는 검증 규칙을 관리합니다.
+ */
 public class Post {
-    private String title;
-    private String content;
-    private final Category category;
-    private final LocalDateTime createdAt;
-    // 심화: 게시글을 구분하는 고유 ID입니다.
-    private final long id;
-    // 게시글 조회수 필드 추가
-    private long viewCount = 0L;
+    private String title; // 예: "첫 번째 게시글"
+    private String content; // 예: "게시글 본문입니다."
+    private final Category category; // 예: Category.GENERAL
+    private final LocalDateTime createdAt; // 예: 2026-10-12T12:00:00
 
-    // CONSTRUCTOR: 게시글 생성에 필요한 값을 전달받습니다.
+    private final long id; // 예: 1L
+
+    private long viewCount = 0L; // 예: 상세 조회 전 0L, 조회 후 1L
+
+    /**
+     * CONSTRUCTOR: ID·제목·본문·카테고리를 검증하고, 작성 시각과 초기 조회수를 가진 게시글을 생성합니다.
+     */
     public Post(
             String title,
             String content,
@@ -21,8 +25,6 @@ public class Post {
             long id
     ) {
 
-        // 모든 입력을 검증한 뒤 필드를 설정합니다.
-        // 심화: 고유 ID는 양수만 허용합니다.
         if (id <= 0) {
             throw new IllegalArgumentException("게시글 ID는 양수여야 합니다.");
         }
@@ -40,26 +42,36 @@ public class Post {
         this.id = id;
     }
 
-    // ------------------------------------ 1차 과제에서 완성
-    // GETTER: 제목 조회
+    /**
+     * METHOD: 현재 제목을 반환합니다.
+     */
     public String getTitle() {return this.title; }
 
-    // GETTER: 본문 조회
+    /**
+     * METHOD: 현재 본문을 반환합니다.
+     */
     public String getContent() {return this.content; }
 
-    // GETTER: 카테고리 조회
+    /**
+     * METHOD: 게시글의 카테고리를 반환합니다.
+     */
     public Category getCategory() {return category; }
 
-    // GETTER: 작성 시각 조회
+    /**
+     * METHOD: 게시글이 생성된 시각을 반환합니다.
+     */
     public LocalDateTime getCreatedAt() {return createdAt; }
 
-    // 심화 GETTER: 고유 ID 조회
+    /**
+     * METHOD: 게시글의 고유 ID를 반환합니다.
+     */
     public long getId() {
         return id;
     }
 
-
-    // METHOD: 제목과 본문을 모두 검증한 뒤 함께 수정합니다.
+    /**
+     * METHOD: 생략되거나 공백인 항목은 기존 값으로 대체하고, 두 항목을 모두 검증한 뒤 수정합니다.
+     */
     public void update(String title, String content) {
         String updatedTitle = (title == null || title.isBlank()) ? this.title : title;
         String updatedContent = (content == null || content.isBlank()) ? this.content : content;
@@ -71,28 +83,34 @@ public class Post {
         this.content = updatedContent;
     }
 
-    // 입력값 검증
-    // METHOD: 제목의 빈 값과 공백 검사
+    /**
+     * METHOD: 제목이 null이거나 공백이면 입력 오류를 발생시킵니다.
+     */
     private void validateTitle(String title) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("제목은 비어 있을 수 없습니다");
         }
     }
 
-    // METHOD: 본문의 빈 값과 공백 검사
+    /**
+     * METHOD: 본문이 null이거나 공백이면 입력 오류를 발생시킵니다.
+     */
     private void validateContent(String content) {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("본문은 비어 있을 수 없습니다");
         }
     }
 
-    // ------------------------------------ 2차 과제에서 완성
-    // METHOD: 현재 조회수를 읽는 메서드
+    /**
+     * METHOD: 현재 조회수를 반환하며, 조회수를 증가시키지는 않습니다.
+     */
     public long getViewCount() {
         return viewCount;
     }
 
-    // METHOD: 조회수를 1증가시키는 메서드
+    /**
+     * METHOD: 상세 조회 시 게시글의 조회수를 1 증가시킵니다.
+     */
     public void increaseViewCount() {
         viewCount++;
     }
