@@ -1,4 +1,7 @@
-package org.sopt;
+package org.sopt.post.dto;
+
+import org.sopt.post.domain.Category;
+import org.sopt.post.domain.Post;
 
 import java.time.LocalDateTime;
 

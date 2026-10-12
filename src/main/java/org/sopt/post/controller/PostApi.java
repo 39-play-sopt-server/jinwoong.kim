@@ -1,4 +1,9 @@
-package org.sopt;
+package org.sopt.post.controller;
+
+import org.sopt.common.response.Response;
+import org.sopt.post.dto.CreatePostRequest;
+import org.sopt.post.dto.PostResponse;
+import org.sopt.post.dto.UpdatePostRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;

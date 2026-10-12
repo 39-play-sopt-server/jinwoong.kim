@@ -1,4 +1,7 @@
-package org.sopt;
+package org.sopt.common.exception;
+
+import org.sopt.common.response.Response;
+import org.sopt.post.domain.Category;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

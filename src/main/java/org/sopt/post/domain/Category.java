@@ -1,4 +1,4 @@
-package org.sopt;
+package org.sopt.post.domain;
 
 public enum Category {
     GENERAL,

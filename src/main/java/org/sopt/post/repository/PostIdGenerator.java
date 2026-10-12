@@ -1,4 +1,4 @@
-package org.sopt;
+package org.sopt.post.repository;
 
 import org.springframework.stereotype.Component;
 

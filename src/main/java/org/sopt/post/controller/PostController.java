@@ -1,4 +1,10 @@
-package org.sopt;
+package org.sopt.post.controller;
+
+import org.sopt.common.response.Response;
+import org.sopt.post.dto.CreatePostRequest;
+import org.sopt.post.dto.PostResponse;
+import org.sopt.post.dto.UpdatePostRequest;
+import org.sopt.post.service.PostService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

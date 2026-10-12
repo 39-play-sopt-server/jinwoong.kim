@@ -1,4 +1,7 @@
-package org.sopt;
+package org.sopt.post.repository;
+
+import org.sopt.post.domain.Post;
+import org.sopt.post.exception.PostNotFoundException;
 
 import org.springframework.stereotype.Repository;
 
