@@ -15,6 +15,9 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 @RestControllerAdvice // Controller에서 발생한 예외를 공통으로 처리
 public class GlobalExceptionHandler {
 
+    // Logger
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     // 이 메서드가 처리할 예외 종류를 지정
     // 404 Error Not Exist
     @ExceptionHandler(PostNotFoundException.class)
@@ -51,6 +54,7 @@ public class GlobalExceptionHandler {
     // 500 Sever Error
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Response<Void>> handleUnexpectedException( Exception exc ) {
+        log.error("처리하지 못한 예외가 발생했습니다.", exc);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Response.failure("서버 내부 오류가 발생했습니다."));
     }
 }
