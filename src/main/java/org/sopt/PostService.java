@@ -13,7 +13,6 @@ public class PostService {
     // CONSTRUCTOR: 저장소와 ID 생성기를 외부에서 전달받습니다.
     // Service는 전달받은 Repository를 통해 저장소에 접근합니다.
     public PostService(PostRepository repo, PostIdGenerator idGenerator) {
-
         this.repo = repo;
         this.idGenerator = idGenerator;
     }
