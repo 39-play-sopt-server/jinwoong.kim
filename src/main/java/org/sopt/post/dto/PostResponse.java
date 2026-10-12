@@ -17,16 +17,18 @@ public record PostResponse (
     long viewCount // 예: 3L
 ) {
     /**
-     * METHOD: Post의 현재 필드 값을 읽어 별도의 응답 DTO를 생성합니다.
+     * METHOD: 게시글 객체를 잠근 상태에서 현재 값을 일관된 응답 DTO로 복사합니다.
      */
     public static PostResponse from(Post post) {
-        return new PostResponse(
-                post.getId(),
-                post.getTitle(),
-                post.getContent(),
-                post.getCategory(),
-                post.getCreatedAt(),
-                post.getViewCount()
-        );
+        synchronized (post) {
+            return new PostResponse(
+                    post.getId(),
+                    post.getTitle(),
+                    post.getContent(),
+                    post.getCategory(),
+                    post.getCreatedAt(),
+                    post.getViewCount()
+            );
+        }
     }
 }

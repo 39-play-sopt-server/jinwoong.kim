@@ -72,7 +72,7 @@ public class Post {
     /**
      * METHOD: 생략되거나 공백인 항목은 기존 값으로 대체하고, 두 항목을 모두 검증한 뒤 수정합니다.
      */
-    public void update(String title, String content) {
+    public synchronized void update(String title, String content) {
         String updatedTitle = (title == null || title.isBlank()) ? this.title : title;
         String updatedContent = (content == null || content.isBlank()) ? this.content : content;
 
@@ -110,8 +110,9 @@ public class Post {
 
     /**
      * METHOD: 상세 조회 시 게시글의 조회수를 1 증가시킵니다.
+     * synchronized:
      */
-    public void increaseViewCount() {
+    public synchronized void increaseViewCount() {
         viewCount++;
     }
 

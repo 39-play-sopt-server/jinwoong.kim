@@ -32,11 +32,18 @@ public class MemoryPostRepository implements PostRepository {
         this.idGenerator = idGenerator;
     }
 
+    /*
+     전체 다 synchronized 추가: 같은 저장소 객체에서 이 네 메서드 중 하나에 한번에 하나의 스레드만 들어갈 수 있습니다.
+     스레드 A: create()로 저장 중
+     스레드 B: findAll() 호출 → 대기
+     스레드 A: 저장 완료, 메서드 종료
+     스레드 B: 목록 조회 시작
+     */
     /**
      * METHOD: 게시글을 조회하며, 존재 여부에 대한 예외 판단은 Service에 맡깁니다.
      */
     @Override
-    public Optional<Post> findById(long id) {
+    public synchronized Optional<Post> findById(long id) {
         return Optional.ofNullable(posts.get(id));
     }
 
@@ -44,7 +51,7 @@ public class MemoryPostRepository implements PostRepository {
      * METHOD: 게시글을 삭제하고, 삭제된 객체가 있었는지 반환합니다.
      */
     @Override
-    public boolean deleteById(long id) {
+    public synchronized boolean deleteById(long id) {
         return posts.remove(id) != null;
     }
 
@@ -52,7 +59,7 @@ public class MemoryPostRepository implements PostRepository {
      * METHOD: TreeMap의 ID 순서대로 별도 목록을 만듭니다. 목록 안의 Post 객체는 저장소와 공유됩니다.
      */
     @Override
-    public List<Post> findAll() {
+    public synchronized List<Post> findAll() {
         return new ArrayList<>(posts.values());
     }
 
@@ -60,7 +67,7 @@ public class MemoryPostRepository implements PostRepository {
      * METHOD: ID를 발급하고 Post 생성자의 검증을 통과한 게시글을 저장합니다.
      */
     @Override
-    public void create(String title, String content, Category category) {
+    public synchronized void create(String title, String content, Category category) {
         long id = idGenerator.generate();
         Post post = new Post(title, content, category, id);
         posts.put(id, post);
