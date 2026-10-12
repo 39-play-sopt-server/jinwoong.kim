@@ -31,16 +31,16 @@ public class PostService {
     }
 
     // 심화 METHOD: 목록 위치 대신 고유 ID로 게시글 조회
-    public Post readPost(long id) {
+    public PostResponse readPost(long id) {
         Post post = repo.findById(id);
         post.increaseViewCount();
-        return post;
+        return PostResponse.from(post);
         // 저장소에서 게시글을 먼저 찾아 저장하고, 조회수를 1증가시키고, 게시글을 반환함
     }
 
     // METHOD: 게시글 목록 조회
-    public List<Post> readPostList() {
-        return repo.findAll();
+    public List<PostResponse> readPostList() {
+        return repo.findAll().stream().map(PostResponse::from).toList();
     }
 
     // 심화 METHOD: 고유 ID로 게시글 수정

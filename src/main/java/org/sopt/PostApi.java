@@ -19,13 +19,13 @@ public interface PostApi {
             summary = "게시글 목록 조회",
             description = "전체 게시글을 ID 오름차순으로 조회합니다. 조회수는 증가하지 않습니다."
     )
-    ResponseEntity<Response<List<Post>>> readPostList();
+    ResponseEntity<Response<List<PostResponse>>> readPostList();
 
     @Operation(
             summary = "게시글 상세 조회",
             description = "ID에 해당하는 게시글을 조회하고 조회수를 1 증가시킵니다."
     )
-    ResponseEntity<Response<Post>> readPost(@PathVariable("postId") long id);
+    ResponseEntity<Response<PostResponse>> readPost(@PathVariable("postId") long id);
 
     @Operation(
             summary = "게시글 수정",

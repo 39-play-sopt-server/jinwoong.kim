@@ -40,7 +40,7 @@ public class PostController implements PostApi {
     // METHOD: 게시글 목록 조회
     @Override
     @GetMapping
-    public ResponseEntity<Response<List<Post>>> readPostList() {
+    public ResponseEntity<Response<List<PostResponse>>> readPostList() {
         return ResponseEntity.ok(
                 Response.success(
                 "게시글 목록을 조회했습니다.",
@@ -53,8 +53,8 @@ public class PostController implements PostApi {
     // METHOD: ID로 게시글 단건 조회
     @Override
     @GetMapping("/{postId}")
-    public ResponseEntity<Response<Post>> readPost(@PathVariable("postId") long id){
-        Post post = service.readPost(id);
+    public ResponseEntity<Response<PostResponse>> readPost(@PathVariable("postId") long id){
+        PostResponse post = service.readPost(id);
 
         return ResponseEntity.ok(Response.success("게시글을 조회했습니다.", post));
     }
