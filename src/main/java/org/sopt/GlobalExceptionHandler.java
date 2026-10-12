@@ -2,8 +2,13 @@ package org.sopt;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.ResourceHttpMessageConverter;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice // Controller에서 발생한 예외를 공통으로 처리
 public class GlobalExceptionHandler {
@@ -18,8 +23,19 @@ public class GlobalExceptionHandler {
 
     // 400 Wrong Input
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Response<Void>> handleIleegalArgument( IllegalArgumentException exc) {
+    public ResponseEntity<Response<Void>> handleIleegalArgument( IllegalArgumentException exc ) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Response.failure(exc.getMessage()));
     }
 
+    // 400 Wrong Category
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Response<Void>> handleMessageNotReadable( HttpMessageNotReadableException exc ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Response.failure("요청 본문의 JSON 형식이나 입력값을 확인해주세요"));
+    }
+
+    // 400 Wrong id type
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Response<Void>> handleTypeMismatch( MethodArgumentTypeMismatchException exc ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Response.failure("요청 값의 형식이 올바르지 않습니다: "+ exc.getName()));
+    }
 }
