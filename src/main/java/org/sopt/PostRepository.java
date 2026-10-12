@@ -25,7 +25,7 @@ public class PostRepository {
         Post post = posts.get(id);
 
         if (post == null) {
-            throw new IllegalArgumentException("존재하지 않는 게시글입니다.");
+            throw new PostNotFoundException();
         }
 
         return post;
@@ -36,7 +36,7 @@ public class PostRepository {
        Post removed =  posts.remove(id);
 
        if (removed == null) {
-           throw new IllegalArgumentException("존재하지 않는 게시글입니다.");
+           throw new PostNotFoundException();
        }
     }
 

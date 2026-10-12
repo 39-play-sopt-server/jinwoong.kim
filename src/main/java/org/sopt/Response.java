@@ -4,7 +4,7 @@ package org.sopt;
 public class Response<T> {
     private final boolean success;
     private final String message;
-    private T data;
+    private final T data; // 응답 데이터의 재할당 방지
 
     // CONSTRUCTOR
     private Response(boolean success, String message, T data) {
