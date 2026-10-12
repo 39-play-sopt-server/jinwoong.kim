@@ -1,6 +1,7 @@
 package org.sopt.post.controller;
 
 import org.sopt.common.response.Response;
+import org.sopt.post.domain.Category;
 import org.sopt.post.dto.CreatePostRequest;
 import org.sopt.post.dto.PostResponse;
 import org.sopt.post.dto.UpdatePostRequest;
@@ -31,9 +32,12 @@ public interface PostApi {
      */
     @Operation(
             summary = "게시글 목록 조회",
-            description = "page(0부터 시작)와 size에 해당하는 게시글을 ID 오름차순으로 조회합니다. 기본값은 page=0, size=5이며 조회수는 증가하지 않습니다."
+            description = "선택한 카테고리의 게시글을 ID 오름차순으로 페이지 조회합니다. "
+                    + "category를 생략하면 전체 카테고리를 조회합니다. "
+                    + "page는 0부터 시작하며 기본값은 page=0, size=5입니다. "
+                    + "조회수는 증가하지 않습니다."
     )
-    ResponseEntity<Response<List<PostResponse>>> readPostList(int page, int size);
+    ResponseEntity<Response<List<PostResponse>>> readPostList(int page, int size, Category category);
 
     /**
      * METHOD: ID로 상세 조회하는 API의 계약을 선언합니다.

@@ -47,8 +47,9 @@ public class PostService {
     /**
      * METHOD: 0부터 시작하는 페이지 번호와 페이지 크기를 검증하고, 해당 구간을 응답 DTO 목록으로 반환합니다.
      * 범위를 벗어난 페이지는 빈 목록을 반환하며, 조회수는 증가시키지 않습니다.
+     * Category 로 페이지 목록을 구분지어 읽어옵니다.
      */
-    public List<PostResponse> readPostList(int page, int size) {
+    public List<PostResponse> readPostList(int page, int size, Category category) {
         if (page < 0) {
             throw new IllegalArgumentException("page는 0 이상이어야 합니다.");
         }
@@ -60,7 +61,12 @@ public class PostService {
         // int 곱셈의 범위 초과를 피하고, 앞 페이지에 해당하는 게시글 수를 계산합니다.
         long offset = (long) page * size;
 
-        return repo.findAll().stream().skip(offset).limit(size).map(PostResponse::from).toList();
+        return repo.findAll().stream()
+                .filter(post -> category == null || post.getCategory() == category)
+                .skip(offset)
+                .limit(size)
+                .map(PostResponse::from)
+                .toList();
     }
 
     /**

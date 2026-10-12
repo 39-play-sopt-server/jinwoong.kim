@@ -5,6 +5,7 @@ import org.sopt.post.dto.CreatePostRequest;
 import org.sopt.post.dto.PostResponse;
 import org.sopt.post.dto.UpdatePostRequest;
 import org.sopt.post.service.PostService;
+import org.sopt.post.domain.Category;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,12 +48,13 @@ public class PostController implements PostApi {
     @GetMapping
     public ResponseEntity<Response<List<PostResponse>>> readPostList(
             @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "5") int size
+            @RequestParam(name = "size", defaultValue = "5") int size,
+            @RequestParam(name = "category", required = false) Category category
     ) {
         return ResponseEntity.ok(
                 Response.success(
                 "게시글 목록을 조회했습니다.",
-                service.readPostList(page, size)
+                service.readPostList(page, size, category)
                 )
         );
     }
