@@ -10,6 +10,8 @@ public class Post {
     private final LocalDateTime createdAt;
     // 심화: 게시글을 구분하는 고유 ID입니다.
     private final long id;
+    // 게시글 조회수 필드 추가
+    private long viewCount = 0L;
 
     // CONSTRUCTOR: 게시글 생성에 필요한 값을 전달받습니다.
     public Post(
@@ -38,7 +40,7 @@ public class Post {
         this.id = id;
     }
 
-    // ------------------------------------
+    // ------------------------------------ 1차 과제에서 완성
     // GETTER: 제목 조회
     public String getTitle() {return this.title; }
 
@@ -80,4 +82,16 @@ public class Post {
             throw new IllegalArgumentException("본문은 비어 있을 수 없습니다");
         }
     }
+
+    // ------------------------------------ 2차 과제에서 완성
+    // METHOD: 현재 조회수를 읽는 메서드
+    public long getViewCount() {
+        return viewCount;
+    }
+
+    // METHOD: 조회수를 1증가시키는 메서드
+    public void increaseViewCount() {
+        viewCount++;
+    }
+
 }
