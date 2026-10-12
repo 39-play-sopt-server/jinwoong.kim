@@ -34,10 +34,12 @@ public class PostController {
     // 심화 view 없애기
     // METHOD: 게시글 목록 조회
     @GetMapping
-    public Response<List<Post>> readPostList() {
-        return Response.success(
+    public ResponseEntity<Response<List<Post>>> readPostList() {
+        return ResponseEntity.ok(
+                Response.success(
                 "게시글 목록을 조회했습니다.",
                 service.readPostList()
+                )
         );
     }
 
