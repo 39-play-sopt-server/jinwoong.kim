@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Repository
 public class MemoryPostRepository implements PostRepository {
@@ -23,24 +24,14 @@ public class MemoryPostRepository implements PostRepository {
 
     // 심화 METHOD: ID로 조회하고 없는 게시글은 예외 처리
     @Override
-    public Post findById(long id) {
-        Post post = posts.get(id);
-
-        if (post == null) {
-            throw new PostNotFoundException();
-        }
-
-        return post;
+    public Optional<Post> findById(long id) {
+        return Optional.ofNullable(posts.get(id));
     }
 
     // 심화 METHOD: ID로 삭제하고 없는 게시글은 예외 처리
     @Override
-    public void deleteById(long id) {
-       Post removed =  posts.remove(id);
-
-       if (removed == null) {
-           throw new PostNotFoundException();
-       }
+    public boolean deleteById(long id) {
+        return posts.remove(id) != null;
     }
 
     // 심화 METHOD: TreeMap의 값을 ID 순으로 정렬해 목록 반환

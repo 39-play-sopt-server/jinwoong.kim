@@ -3,6 +3,7 @@ package org.sopt.post.service;
 import org.sopt.post.domain.Category;
 import org.sopt.post.domain.Post;
 import org.sopt.post.dto.PostResponse;
+import org.sopt.post.exception.PostNotFoundException;
 import org.sopt.post.repository.PostIdGenerator;
 import org.sopt.post.repository.PostRepository;
 
@@ -37,7 +38,7 @@ public class PostService {
 
     // 심화 METHOD: 목록 위치 대신 고유 ID로 게시글 조회
     public PostResponse readPost(long id) {
-        Post post = repo.findById(id);
+        Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
         post.increaseViewCount();
         return PostResponse.from(post);
         // 저장소에서 게시글을 먼저 찾아 저장하고, 조회수를 1증가시키고, 게시글을 반환함
@@ -54,13 +55,16 @@ public class PostService {
             String newTitle,
             String newContent
     ) {
-        Post post = repo.findById(id);
+        Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
         post.update(newTitle, newContent);
     }
 
     // 심화 METHOD: 고유 ID로 게시글 삭제
     public void deletePost(long id) {
+        boolean deleted = repo.deleteById(id);
 
-        repo.deleteById(id);
+        if(!deleted) {
+            throw new PostNotFoundException();
+        }
     }
 }
