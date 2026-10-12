@@ -11,15 +11,19 @@ import java.util.TreeMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.sopt.post.domain.Category;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
 @Repository
 public class MemoryPostRepository implements PostRepository {
     // 심화: ID를 key로 사용하는 HashMap 저장소ㄴ
     private final Map<Long, Post> posts = new TreeMap<>();
 
-    // 심화 METHOD: ID를 key로 게시글 저장
-    @Override
-    public void save(Post post) {
-        posts.put(post.getId(), post); // 심화: ID 기반 저장소
+    private final PostIdGenerator idGenerator;
+
+    // CONSTRUCTOR
+    public MemoryPostRepository(PostIdGenerator idGenerator) {
+        this.idGenerator = idGenerator;
     }
 
     // 심화 METHOD: ID로 조회하고 없는 게시글은 예외 처리
@@ -42,4 +46,11 @@ public class MemoryPostRepository implements PostRepository {
         return new ArrayList<>(posts.values());
     }
 
+    // METHOD: create
+    @Override
+    public void create(String title, String content, Category category) {
+        long id = idGenerator.generate();
+        Post post = new Post(title, content, category, id);
+        posts.put(id, post);
+    }
 }

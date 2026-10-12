@@ -4,7 +4,6 @@ import org.sopt.post.domain.Category;
 import org.sopt.post.domain.Post;
 import org.sopt.post.dto.PostResponse;
 import org.sopt.post.exception.PostNotFoundException;
-import org.sopt.post.repository.PostIdGenerator;
 import org.sopt.post.repository.PostRepository;
 
 import org.springframework.stereotype.Service;
@@ -14,14 +13,11 @@ import java.util.List;
 @Service
 public class PostService {
     private final PostRepository repo;
-    // 심화: 게시글 ID 생성기
-    private final PostIdGenerator idGenerator;
 
     // CONSTRUCTOR: 저장소와 ID 생성기를 외부에서 전달받습니다.
     // Service는 전달받은 Repository를 통해 저장소에 접근합니다.
-    public PostService(PostRepository repo, PostIdGenerator idGenerator) {
+    public PostService(PostRepository repo) {
         this.repo = repo;
-        this.idGenerator = idGenerator;
     }
 
     // METHOD: 게시글 작성
@@ -30,10 +26,7 @@ public class PostService {
             String title,
             String content,
             Category category) {
-        long id = idGenerator.generate();
-        Post post = new Post(title, content, category, id);
-
-        repo.save(post);
+        repo.create(title, content, category);
     }
 
     // 심화 METHOD: 목록 위치 대신 고유 ID로 게시글 조회
