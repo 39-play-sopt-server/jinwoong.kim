@@ -1,33 +1,40 @@
 package org.sopt.post.domain;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
 import java.time.LocalDateTime;
 
 /**
  * CLASS: 게시글의 상태와 생성·수정 시 지켜야 하는 검증 규칙을 관리합니다.
  */
+@Entity
 public class Post {
     private String title; // 예: "첫 번째 게시글"
     private String content; // 예: "게시글 본문입니다."
-    private final Category category; // 예: Category.GENERAL
-    private final LocalDateTime createdAt; // 예: 2026-10-12T12:00:00
+    private Category category; // 예: Category.GENERAL
+    private LocalDateTime createdAt; // 예: 2026-10-12T12:00:00
 
-    private final long id; // 예: 1L
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id; // 예: 1L
 
-    private long viewCount = 0L; // 예: 상세 조회 전 0L, 조회 후 1L
+    private Long viewCount = 0L; // 예: 상세 조회 전 0L, 조회 후 1L
 
     /**
      * CONSTRUCTOR: ID·제목·본문·카테고리를 검증하고, 작성 시각과 초기 조회수를 가진 게시글을 생성합니다.
      */
+    protected Post() {
+    }
+
     public Post(
             String title,
             String content,
-            Category category,
-            long id
+            Category category
     ) {
 
-        if (id <= 0) {
-            throw new IllegalArgumentException("게시글 ID는 양수여야 합니다.");
-        }
         validateContent(content);
         validateTitle(title);
 
@@ -39,7 +46,6 @@ public class Post {
         this.content = content;
         this.category = category;
         this.createdAt = LocalDateTime.now();
-        this.id = id;
     }
 
     /**
