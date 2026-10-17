@@ -1,5 +1,6 @@
 package org.sopt.post.service;
 
+import jakarta.transaction.Transactional;
 import org.sopt.post.domain.Category;
 import org.sopt.post.domain.Post;
 import org.sopt.post.dto.PostResponse;
@@ -31,12 +32,14 @@ public class PostService {
             String title,
             String content,
             Category category) {
-        repo.create(title, content, category);
+        Post post = new Post(title, content, category);
+        repo.save(post); // 생성자로 개시글을 만들고 save로 db에저장됨
     }
 
     /**
      * METHOD: 게시글이 없으면 예외를 발생시키고, 있으면 조회수를 증가시킨 뒤 응답 DTO로 반환합니다.
      */
+    @Transactional
     public PostResponse readPost(long id) {
         Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
         post.increaseViewCount();
@@ -72,6 +75,7 @@ public class PostService {
     /**
      * METHOD: 게시글이 없으면 예외를 발생시키고, 있으면 객체의 검증 규칙에 따라 수정합니다.
      */
+    @Transactional
     public void updatePost(
             long id,
             String newTitle,
@@ -84,11 +88,10 @@ public class PostService {
     /**
      * METHOD: 저장소의 삭제 결과를 확인하고, 삭제할 게시글이 없으면 예외를 발생시킵니다.
      */
+    @Transactional //실습: 조회와 삭제를 하나의 트랜잭션으로
     public void deletePost(long id) {
-        boolean deleted = repo.deleteById(id);
+        Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
 
-        if(!deleted) {
-            throw new PostNotFoundException();
-        }
+        repo.delete(post);
     }
 }

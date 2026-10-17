@@ -20,7 +20,7 @@ class PostConcurrencyTest {
      */
     @Test
     void concurrentViewsPreserveEveryIncrement() throws Exception {
-        Post post = new Post("제목", "본문", Category.GENERAL, 1L);
+        Post post = new Post("제목", "본문", Category.GENERAL);
 
         try (ExecutorService executor = Executors.newFixedThreadPool(10)) {
             List<Future<?>> tasks = new ArrayList<>();
