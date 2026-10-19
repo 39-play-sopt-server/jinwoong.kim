@@ -14,7 +14,9 @@ public record PostResponse (
     String content, // 예: "게시글 본문"
     Category category, // 예: Category.GENERAL
     LocalDateTime createdAt, // 예: 2026-10-12T12:00:00
-    long viewCount // 예: 3L
+    long viewCount, // 예: 3L
+    Long memberId,
+    String authorName
 ) {
     /**
      * METHOD: 게시글 객체를 잠근 상태에서 현재 값을 일관된 응답 DTO로 복사합니다.
@@ -27,7 +29,9 @@ public record PostResponse (
                     post.getContent(),
                     post.getCategory(),
                     post.getCreatedAt(),
-                    post.getViewCount()
+                    post.getViewCount(),
+                    post.getMember().getId(),
+                    post.getMember().getName()
             );
         }
     }
