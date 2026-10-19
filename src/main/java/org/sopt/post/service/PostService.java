@@ -1,6 +1,9 @@
 package org.sopt.post.service;
 
 import jakarta.transaction.Transactional;
+import org.sopt.member.domain.Member;
+import org.sopt.member.exception.MemberNotFoundException;
+import org.sopt.member.repository.MemberRepository;
 import org.sopt.post.domain.Category;
 import org.sopt.post.domain.Post;
 import org.sopt.post.dto.PostResponse;
@@ -17,12 +20,14 @@ import java.util.List;
 @Service
 public class PostService {
     private final PostRepository repo; // 예: Spring이 주입한 MemoryPostRepository 객체
+    private final MemberRepository members; // 예: Spring이 주입한 MemberRepository
 
     /**
      * CONSTRUCTOR: 저장 방식에 의존하지 않도록 PostRepository 인터페이스를 주입받습니다.
      */
-    public PostService(PostRepository repo) {
+    public PostService(PostRepository repo, MemberRepository members) {
         this.repo = repo;
+        this.members = members;
     }
 
     /**
@@ -31,8 +36,15 @@ public class PostService {
     public void createPost(
             String title,
             String content,
-            Category category) {
-        Post post = new Post(title, content, category);
+            Category category,
+            Long memberId) {
+        if (memberId == null || memberId <= 0) {
+            throw new IllegalArgumentException("올바른 작성자 ID가 필요합니다.");
+        }
+        Member member = members.findById(memberId).orElseThrow(MemberNotFoundException::new);
+        // members 도메인에서 id 가져오기
+
+        Post post = new Post(title, content, category, member);
         repo.save(post); // 생성자로 개시글을 만들고 save로 db에저장됨
     }
 

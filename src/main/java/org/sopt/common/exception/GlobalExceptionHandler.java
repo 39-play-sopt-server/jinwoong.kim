@@ -3,6 +3,7 @@ package org.sopt.common.exception;
 import org.sopt.common.response.Response;
 import org.sopt.post.domain.Category;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -78,5 +79,13 @@ public class GlobalExceptionHandler {
         log.error("처리하지 못한 예외가 발생했습니다.", exc);
         ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
         return ResponseEntity.status(errorCode.getStatus()).body(Response.failure(errorCode.getMessage()));
+    }
+
+    /**
+     * METHOD: DB 제약조건 충돌을 409 응답으로 변환
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Response<Void>> handleIntergrity(DataIntegrityViolationException exc) {
+        return ResponseEntity.status(409).body(Response.failure("데이터 제약조건과 충돌합니다."));
     }
 }

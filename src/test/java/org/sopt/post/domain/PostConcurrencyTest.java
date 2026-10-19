@@ -1,6 +1,7 @@
 package org.sopt.post.domain;
 
 import org.junit.jupiter.api.Test;
+import org.sopt.member.domain.Member;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +21,7 @@ class PostConcurrencyTest {
      */
     @Test
     void concurrentViewsPreserveEveryIncrement() throws Exception {
-        Post post = new Post("제목", "본문", Category.GENERAL);
+        Post post = new Post("제목", "본문", Category.GENERAL, new Member("테스트"));
 
         try (ExecutorService executor = Executors.newFixedThreadPool(10)) {
             List<Future<?>> tasks = new ArrayList<>();

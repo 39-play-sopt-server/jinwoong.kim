@@ -34,7 +34,18 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR( // 예: 처리하지 못한 서버 내부 예외
             HttpStatus.INTERNAL_SERVER_ERROR,
             "서버 내부 오류가 발생했습니다."
+    ),
+
+    MEMBER_NOT_FOUND ( // 예: 없는 회원 ID로 게시글 생성
+            HttpStatus.NOT_FOUND,
+                       "존재하지 않는 회원입니다."
+    ),
+
+    MEMBER_HAS_POSTS ( // 예: 작성한 게시글이 남은 회원의 탈퇴 요청
+            HttpStatus.CONFLICT,
+            "게시글을 먼저 삭제해주세요."
     );
+
 
     private final HttpStatus status; // 예: HttpStatus.NOT_FOUND (404)
     private final String message; // 예: "존재하지 않는 게시글입니다."
@@ -60,4 +71,5 @@ public enum ErrorCode {
     public String getMessage() {
         return message;
     }
+
 }

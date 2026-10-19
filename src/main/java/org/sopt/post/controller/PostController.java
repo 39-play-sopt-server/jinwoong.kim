@@ -36,7 +36,7 @@ public class PostController implements PostApi {
     @Override
     @PostMapping
     public ResponseEntity<Response<Void>> createPost(@RequestBody CreatePostRequest request) {
-        service.createPost(request.title(), request.content(), request.category());
+        service.createPost(request.title(), request.content(), request.category(), request.memberId());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Response.success("게시글이 작성되었습니다.", null));
     }
