@@ -1,6 +1,6 @@
 package org.sopt.member.service;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.sopt.common.exception.BusinessException;
 import org.sopt.common.exception.ErrorCode;
 import org.sopt.member.domain.Member;

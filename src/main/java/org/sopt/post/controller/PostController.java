@@ -2,6 +2,7 @@ package org.sopt.post.controller;
 
 import org.sopt.common.response.Response;
 import org.sopt.post.dto.CreatePostRequest;
+import org.sopt.post.dto.PostPageResponse;
 import org.sopt.post.dto.PostResponse;
 import org.sopt.post.dto.UpdatePostRequest;
 import org.sopt.post.service.PostService;
@@ -46,7 +47,7 @@ public class PostController implements PostApi {
      */
     @Override
     @GetMapping
-    public ResponseEntity<Response<List<PostResponse>>> readPostList(
+    public ResponseEntity<Response<PostPageResponse>> readPostList(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "5") int size,
             @RequestParam(name = "category", required = false) Category category
