@@ -58,7 +58,7 @@ public class PostService {
      */
     @Transactional
     public PostResponse readPost(long id) {
-        Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
+        Post post = repo.findForUpdate(id).orElseThrow(PostNotFoundException::new);
         post.increaseViewCount();
         return PostResponse.from(post);
 
