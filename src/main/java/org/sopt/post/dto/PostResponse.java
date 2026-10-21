@@ -16,12 +16,13 @@ public record PostResponse (
     LocalDateTime createdAt, // 예: 2026-10-12T12:00:00
     long viewCount, // 예: 3L
     Long memberId,
-    String authorName
+    String authorName,
+    long likeCount // 예: 3L
 ) {
     /**
      * METHOD: 게시글 객체를 잠근 상태에서 현재 값을 일관된 응답 DTO로 복사합니다.
      */
-    public static PostResponse from(Post post) {
+    public static PostResponse from(Post post, long LikeCount) {
         synchronized (post) {
             return new PostResponse(
                     post.getId(),
@@ -31,7 +32,8 @@ public record PostResponse (
                     post.getCreatedAt(),
                     post.getViewCount(),
                     post.getMember().getId(),
-                    post.getMember().getName()
+                    post.getMember().getName(),
+                    LikeCount
             );
         }
     }

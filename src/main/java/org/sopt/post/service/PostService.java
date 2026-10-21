@@ -1,5 +1,7 @@
 package org.sopt.post.service;
 
+import org.sopt.like.domain.PostLike;
+import org.sopt.like.repository.PostLikeRepository;
 import org.sopt.post.dto.PostPageResponse;
 import org.sopt.post.repository.PostSpecifications;
 import org.springframework.data.domain.Page;
@@ -25,14 +27,16 @@ import java.util.List;
 @Service
 public class PostService {
     private final PostRepository repo; // 예: Spring이 주입한 MemoryPostRepository 객체
+    private final PostLikeRepository likes; // 예: 좋아요 집계, 삭제 저장소
     private final MemberRepository members; // 예: Spring이 주입한 MemberRepository
 
     /**
      * CONSTRUCTOR: 저장 방식에 의존하지 않도록 PostRepository 인터페이스를 주입받습니다.
      */
-    public PostService(PostRepository repo, MemberRepository members) {
+    public PostService(PostRepository repo, MemberRepository members, PostLikeRepository likes) {
         this.repo = repo;
         this.members = members;
+        this.likes = likes;
     }
 
     /**
@@ -61,8 +65,8 @@ public class PostService {
     public PostResponse readPost(long id) {
         Post post = repo.findForUpdate(id).orElseThrow(PostNotFoundException::new);
         post.increaseViewCount();
-        return PostResponse.from(post);
 
+        return PostResponse.from(post, likes.countByPost_Id(post.getId()));
     }
 
     /**
@@ -85,8 +89,8 @@ public class PostService {
         }
 
         Page<Post> result = repo.findAll(PostSpecifications.filter(memberId, cat, title), pageable);
-
-        return PostPageResponse.from(result.map(PostResponse::from));
+        return PostPageResponse.from(result.map(post ->
+                PostResponse.from(post, likes.countByPost_Id(post.getId()))));
     }
     /**
      * METHOD: 게시글이 없으면 예외를 발생시키고, 있으면 객체의 검증 규칙에 따라 수정합니다.
@@ -107,7 +111,8 @@ public class PostService {
     @Transactional //실습: 조회와 삭제를 하나의 트랜잭션으로
     public void deletePost(long id) {
         Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
-
+        likes.deleteByPost_Id(id);
+        likes.flush();
         repo.delete(post);
     }
 }

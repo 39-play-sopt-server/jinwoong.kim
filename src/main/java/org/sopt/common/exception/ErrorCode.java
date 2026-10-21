@@ -7,6 +7,16 @@ import org.springframework.http.HttpStatus;
  */
 public enum ErrorCode {
 
+    LIKE_NOT_FOUND( //  예: 좋아요를 누르지 않은 회원의 취소 요청
+            HttpStatus.NOT_FOUND,
+            "좋아요를 누른 흔적이 없습니다."
+    ),
+
+    MEMBER_HAS_LIKES( // 예 좋아요가 남은 회원의 탈퇴
+            HttpStatus.CONFLICT,
+            "좋아요를 먼저 취소해주세요."
+    ),
+
     POST_NOT_FOUND( // 예: 없는 게시글 ID 조회
             HttpStatus.NOT_FOUND,
             "존재하지 않는 게시글입니다."

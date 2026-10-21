@@ -1,5 +1,6 @@
 package org.sopt.member.service;
 
+import org.sopt.like.repository.PostLikeRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.sopt.common.exception.BusinessException;
 import org.sopt.common.exception.ErrorCode;
@@ -17,14 +18,16 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class MemberService {
     private final MemberRepository members; // 예: Spring이 주입한 MemberRepository
+    private final PostLikeRepository likes; // 예: 좋아요 존재 여부 확인 저장소
     private final PostRepository posts; // 예: Spring이 주입한 PostRepository
 
     /**
      * CONTRUCTOR: 업무 처리에 필요한 저장소 또는 Service를 생성자로 주입받음
      */
-    public MemberService(MemberRepository members, PostRepository posts) {
+    public MemberService(MemberRepository members, PostRepository posts, PostLikeRepository likes) {
         this.members = members;
         this.posts = posts;
+        this.likes = likes;
     }
 
     /**
