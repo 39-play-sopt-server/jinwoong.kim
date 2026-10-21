@@ -46,3 +46,4 @@ bin/
 
 # Personal study pages
 /for_personal_study/
+.env
