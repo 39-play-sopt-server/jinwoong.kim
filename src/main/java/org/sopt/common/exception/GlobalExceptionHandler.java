@@ -1,82 +1,103 @@
 package org.sopt.common.exception;
 
-import org.sopt.common.response.Response;
-import org.sopt.post.domain.Category;
-
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.sopt.common.response.ApiResponse;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import org.springframework.http.converter.HttpMessageNotReadableException;
-
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-
-import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
- * CLASS: 업무 예외와 요청 처리 중 발생한 예외를 공통 HTTP 오류 응답으로 변환합니다.
+ * CLASS: Spring 기본 예외의 HTTP 상태·헤더를 보존하면서 공통 API 오류 응답을 제공합니다.
  */
+@NullMarked
 @RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class); // 예: 예상하지 못한 예외의 메시지와 스택 트레이스 기록
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
-     * METHOD: 업무 예외에 지정된 ErrorCode의 상태 코드와 예외 메시지로 응답합니다.
+     * METHOD: 도메인 업무 예외의 상태·코드·메시지를 응답합니다.
      */
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<Response<Void>> handleBusinessException( BusinessException exc) {
-        ErrorCode errorCode = exc.getErrorCode();
-
-        return ResponseEntity.status(errorCode.getStatus()).body(Response.failure(exc.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
+        ErrorCode code = exception.getErrorCode();
+        return ResponseEntity.status(code.getStatus()).body(ApiResponse.failure(code, exception.getMessage()));
     }
 
     /**
-     * METHOD: 입력값 검증 실패를 400으로 응답하고, 구체적인 검증 메시지를 유지합니다.
+     * METHOD: 엔티티·Service 입력값 검증 실패를 400으로 응답합니다.
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Response<Void>> handleIllegalArgument( IllegalArgumentException exc ) {
-        ErrorCode errorCode = ErrorCode.INVALID_INPUT;
-        return ResponseEntity.status(errorCode.getStatus()).body(Response.failure(exc.getMessage()));
-
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(ApiResponse.failure(CommonErrorCode.INVALID_INPUT, exception.getMessage()));
     }
 
     /**
-     * METHOD: 잘못된 JSON이나 본문 값의 변환 실패를 400으로 응답합니다.
+     * METHOD: FK·고유 키 등 DB 제약 위반을 409로 응답합니다.
      */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Response<Void>> handleMessageNotReadable( HttpMessageNotReadableException exc ) {
-        ErrorCode errorCode = ErrorCode.INVALID_REQUEST_BODY;
-        return ResponseEntity.status(errorCode.getStatus()).body(Response.failure(errorCode.getMessage()));
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIntegrity(DataIntegrityViolationException exception) {
+        return ResponseEntity.status(CommonErrorCode.DATA_INTEGRITY_VIOLATION.getStatus())
+                .body(ApiResponse.failure(CommonErrorCode.DATA_INTEGRITY_VIOLATION));
     }
 
     /**
-     * METHOD: 경로·쿼리 매개변수의 타입 변환 실패를 400으로 응답하며, 해당 항목 이름을 제공합니다.
+     * METHOD: Spring이 판단한 400·404·405·415 등의 상태와 Allow 헤더를 유지합니다.
+     * 지원하지 않는 Accept는 본문을 생략해 JSON 변환 실패가 다시 발생하지 않게 합니다.
      */
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<Response<Void>> handleTypeMismatch( MethodArgumentTypeMismatchException exc ) {
-        ErrorCode errorCode = ErrorCode.INVALID_PARAMETER_TYPE;
-        return ResponseEntity.status(errorCode.getStatus())
-                .body(Response.failure(errorCode.getMessage() + " 항목: " + exc.getName()));
+    @Override
+    protected @Nullable ResponseEntity<Object> handleExceptionInternal(
+            Exception exception, @Nullable Object body, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        if (status.value() == 406) {
+            return new ResponseEntity<>(null, headers, status);
+        }
+
+        CommonErrorCode code = frameworkCode(exception, status);
+        String message = code.getMessage();
+        if (exception instanceof MethodArgumentTypeMismatchException mismatch) {
+            message += " 항목: " + mismatch.getName();
+        }
+        if (status.is5xxServerError()) {
+            log.error("Spring 요청 처리 중 서버 오류가 발생했습니다.", exception);
+        }
+        return super.handleExceptionInternal(exception, ApiResponse.failure(code, message), headers, status, request);
     }
 
     /**
-     * METHOD: 지원하지 않는 HTTP 메서드를 405로 응답하고, Allow 등 예외의 응답 헤더를 유지합니다.
+     * METHOD: 프레임워크 예외의 상태를 공통 식별 코드로 연결합니다.
      */
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<Response<Void>> handleMethodNotSupported( HttpRequestMethodNotSupportedException exc ) {
-        ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
-        return ResponseEntity.status(errorCode.getStatus()).headers(exc.getHeaders())
-                .body(Response.failure(errorCode.getMessage()));
+    private CommonErrorCode frameworkCode(Exception exception, HttpStatusCode status) {
+        if (exception instanceof HttpMessageNotReadableException) {
+            return CommonErrorCode.INVALID_REQUEST_BODY;
+        }
+        if (exception instanceof MethodArgumentTypeMismatchException) {
+            return CommonErrorCode.INVALID_PARAMETER_TYPE;
+        }
+        return switch (status.value()) {
+            case 404 -> CommonErrorCode.RESOURCE_NOT_FOUND;
+            case 405 -> CommonErrorCode.METHOD_NOT_ALLOWED;
+            case 415 -> CommonErrorCode.UNSUPPORTED_MEDIA_TYPE;
+            default -> status.is5xxServerError()
+                    ? CommonErrorCode.INTERNAL_SERVER_ERROR : CommonErrorCode.INVALID_REQUEST;
+        };
     }
 
     /**
-     * METHOD: 예상하지 못한 예외는 로그에 기록하고, 내부 오류 정보를 노출하지 않는 500 응답을 반환합니다.
+     * METHOD: 예상하지 못한 예외만 500으로 응답하고 원인 스택을 로그에 남깁니다.
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Response<Void>> handleUnexpectedException( Exception exc ) {
-        log.error("처리하지 못한 예외가 발생했습니다.", exc);
-        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
-        return ResponseEntity.status(errorCode.getStatus()).body(Response.failure(errorCode.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception exception) {
+        log.error("처리하지 못한 예외가 발생했습니다.", exception);
+        return ResponseEntity.internalServerError().body(ApiResponse.failure(CommonErrorCode.INTERNAL_SERVER_ERROR));
     }
 }

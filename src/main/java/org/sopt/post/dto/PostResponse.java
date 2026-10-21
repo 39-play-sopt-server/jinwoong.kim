@@ -14,21 +14,25 @@ public record PostResponse (
     String content, // 예: "게시글 본문"
     Category category, // 예: Category.GENERAL
     LocalDateTime createdAt, // 예: 2026-10-12T12:00:00
-    long viewCount // 예: 3L
+    long viewCount, // 예: 3L
+    Long memberId,
+    String authorName,
+    long likeCount // 예: 3L
 ) {
     /**
-     * METHOD: 게시글 객체를 잠근 상태에서 현재 값을 일관된 응답 DTO로 복사합니다.
+     * METHOD: Service 트랜잭션 안에서 게시글과 작성자 및 좋아요 수를 응답 DTO로 복사합니다.
      */
-    public static PostResponse from(Post post) {
-        synchronized (post) {
-            return new PostResponse(
-                    post.getId(),
-                    post.getTitle(),
-                    post.getContent(),
-                    post.getCategory(),
-                    post.getCreatedAt(),
-                    post.getViewCount()
-            );
-        }
+    public static PostResponse from(Post post, long likeCount) {
+        return new PostResponse(
+                post.getId(),
+                post.getTitle(),
+                post.getContent(),
+                post.getCategory(),
+                post.getCreatedAt(),
+                post.getViewCount(),
+                post.getMember().getId(),
+                post.getMember().getName(),
+                likeCount
+        );
     }
 }
