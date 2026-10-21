@@ -205,6 +205,100 @@ class Assignment3ApiTest {
     }
 
     /**
+     * METHOD: Spring 기본 예외가 500으로 바뀌지 않고 상태·식별 코드·Allow 헤더를 유지하는지 검증합니다.
+     */
+    @Test
+    void frameworkExceptionsKeepTheirHttpStatus() throws Exception {
+        var missing = assertStatus(404, request("GET", "/missing-route", null));
+        assertEquals("RESOURCE_NOT_FOUND", missing.read("$.code"));
+
+        var badId = assertStatus(400, request("GET", "/posts/not-a-number", null));
+        assertEquals("INVALID_PARAMETER_TYPE", badId.read("$.code"));
+        var badJson = assertStatus(400, request("POST", "/members", "{"));
+        assertEquals("INVALID_REQUEST_BODY", badJson.read("$.code"));
+
+        long member = createMember("메서드 확인 회원");
+        var methodResponse = request("PATCH", "/members/" + member, null);
+        var wrongMethod = assertStatus(405, methodResponse);
+        assertEquals("METHOD_NOT_ALLOWED", wrongMethod.read("$.code"));
+        assertTrue(methodResponse.headers().firstValue("Allow").orElseThrow().contains("DELETE"));
+
+        var unsupported = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/members"))
+                .timeout(Duration.ofSeconds(20))
+                .header("Content-Type", "text/plain")
+                .POST(HttpRequest.BodyPublishers.ofString("plain text"))
+                .build();
+        var media = assertStatus(415, client.send(unsupported, HttpResponse.BodyHandlers.ofString()));
+        assertEquals("UNSUPPORTED_MEDIA_TYPE", media.read("$.code"));
+    }
+
+    /**
+     * METHOD: JSON을 거부한 생성 요청은 데이터 저장 전에 406으로 거절하는지 검증합니다.
+     */
+    @Test
+    void unsupportedAcceptDoesNotCreateResources() throws Exception {
+        String memberName = prefix + "-accept";
+        var memberRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/members"))
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "text/plain").header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + memberName + "\"}"))
+                .build();
+        var response = client.send(memberRequest, HttpResponse.BodyHandlers.ofString());
+        // 실패하더라도 테스트가 만든 회원만 정리할 수 있도록 ID를 기록합니다.
+        memberIds.addAll(jdbc.queryForList("SELECT id FROM member WHERE name = ?", Long.class, memberName));
+        assertEquals(406, response.statusCode());
+        assertTrue(response.body().isEmpty());
+        assertTrue(memberIds.isEmpty(), "거절된 요청으로 회원이 저장되면 안 됩니다.");
+
+        long author = createMember("Accept 테스트 회원");
+        String title = prefix + "-rejected-post";
+        var postRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/posts"))
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "text/plain").header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"title\":\"" + title
+                        + "\",\"content\":\"본문\",\"category\":\"GENERAL\",\"memberId\":" + author + "}"))
+                .build();
+        assertEquals(406, client.send(postRequest, HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM post WHERE member_id = ?", Long.class, author));
+    }
+
+    /**
+     * METHOD: 좋아요만 남은 회원의 탈퇴가 도메인 오류 코드로 거절되는지 검증합니다.
+     */
+    @Test
+    void remainingLikesBlockMemberDeletionWithDomainCode() throws Exception {
+        long author = createMember("좋아요 글 작성자");
+        long reader = createMember("좋아요만 가진 회원");
+        long postId = createPost(author, prefix + "-withdraw", "GENERAL");
+        String likePath = "/posts/" + postId + "/likes/" + reader;
+        assertStatus(200, request("PUT", likePath, null));
+        var rejected = assertStatus(409, request("DELETE", "/members/" + reader, null));
+        assertEquals("MEMBER_HAS_LIKES", rejected.read("$.code"));
+        assertStatus(200, request("DELETE", likePath, null));
+        assertStatus(200, request("DELETE", "/members/" + reader, null));
+    }
+
+    /**
+     * METHOD: 생성된 OpenAPI 문서가 회원·게시글·좋아요 그룹과 실제 응답 코드를 포함하는지 검증합니다.
+     */
+    @Test
+    void swaggerDocumentsEveryDomainAndResponse() throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/v3/api-docs"))
+                .timeout(Duration.ofSeconds(20)).GET().build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode(), response.body());
+        var doc = JsonPath.parse(response.body());
+        assertEquals("MEMBER", doc.read("$.paths['/api/v1/members'].post.tags[0]"));
+        assertEquals("POST", doc.read("$.paths['/api/v1/posts'].post.tags[0]"));
+        assertEquals("LIKE", doc.read("$.paths['/api/v1/posts/{postId}/likes/{memberId}'].put.tags[0]"));
+        assertNotNull(doc.read("$.paths['/api/v1/members'].post.summary"));
+        assertNotNull(doc.read("$.paths['/api/v1/members/{memberId}'].delete.responses['409']"));
+        assertNotNull(doc.read("$.paths['/api/v1/posts'].post.responses['201']"));
+        assertNotNull(doc.read("$.paths['/api/v1/posts'].post.responses['406']"));
+        assertNotNull(doc.read("$.paths['/api/v1/posts/{postId}/likes/{memberId}'].delete.responses['404']"));
+    }
+
+    /**
      * METHOD: 회원을 HTTP로 생성하고 정리할 ID를 기록합니다.
      */
     private long createMember(String name) throws Exception {
@@ -218,9 +312,14 @@ class Assignment3ApiTest {
      * METHOD: 고유 제목의 게시글을 HTTP로 생성하고 DB에서 ID를 확인합니다.
      */
     private long createPost(long author, String title, String category) throws Exception {
-        assertStatus(201, request("POST", "/posts", "{\"title\":\"" + title
-                + "\",\"content\":\"테스트 본문\",\"category\":\"" + category + "\",\"memberId\":" + author + "}"));
-        return jdbc.queryForObject("SELECT id FROM post WHERE member_id = ? AND title = ?", Long.class, author, title);
+        var http = request("POST", "/posts", "{\"title\":\"" + title
+                + "\",\"content\":\"테스트 본문\",\"category\":\"" + category + "\",\"memberId\":" + author + "}");
+        var body = assertStatus(201, http);
+        long id = number(body, "$.data.id");
+        assertEquals("POST_CREATED", body.read("$.code"));
+        assertEquals("/api/v1/posts/" + id, http.headers().firstValue("Location").orElseThrow());
+        assertEquals(title, jdbc.queryForObject("SELECT title FROM post WHERE id = ?", String.class, id));
+        return id;
     }
 
     /**
@@ -240,6 +339,7 @@ class Assignment3ApiTest {
         assertEquals(expected, response.statusCode(), response.body());
         DocumentContext body = JsonPath.parse(response.body());
         assertEquals(expected < 400, body.read("$.success", Boolean.class));
+        assertFalse(body.read("$.code", String.class).isBlank(), "모든 JSON 응답에 식별 코드가 있어야 합니다.");
         return body;
     }
 

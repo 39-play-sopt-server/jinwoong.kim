@@ -1,24 +1,23 @@
 package org.sopt.post.controller;
 
-import org.sopt.common.response.Response;
+import java.net.URI;
+import org.sopt.common.response.ApiResponse;
+import org.sopt.post.domain.Category;
 import org.sopt.post.dto.CreatePostRequest;
+import org.sopt.post.dto.PostIdResponse;
 import org.sopt.post.dto.PostPageResponse;
 import org.sopt.post.dto.PostResponse;
 import org.sopt.post.dto.UpdatePostRequest;
 import org.sopt.post.service.PostService;
-import org.sopt.post.domain.Category;
-
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * CLASS: 게시글 HTTP 요청을 받아 Service에 위임하고 성공 응답을 반환합니다.
  */
 @RestController
-@RequestMapping("/api/v1/posts")
+@RequestMapping(value = "/api/v1/posts", produces = MediaType.APPLICATION_JSON_VALUE)
 public class PostController implements PostApi {
 
     private final PostService service; // 예: 생성자로 주입받은 PostService 객체
@@ -36,10 +35,10 @@ public class PostController implements PostApi {
      */
     @Override
     @PostMapping
-    public ResponseEntity<Response<Void>> createPost(@RequestBody CreatePostRequest request) {
-        service.createPost(request.title(), request.content(), request.category(), request.memberId());
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(Response.success("게시글이 작성되었습니다.", null));
+    public ResponseEntity<ApiResponse<PostIdResponse>> createPost(@RequestBody CreatePostRequest request) {
+        Long id = service.createPost(request.title(), request.content(), request.category(), request.memberId());
+        return ResponseEntity.created(URI.create("/api/v1/posts/" + id))
+                .body(ApiResponse.success(PostSuccessCode.POST_CREATED, new PostIdResponse(id)));
     }
 
     /**
@@ -47,7 +46,7 @@ public class PostController implements PostApi {
      */
     @Override
     @GetMapping
-    public ResponseEntity<Response<PostPageResponse>> readPostList(
+    public ResponseEntity<ApiResponse<PostPageResponse>> readPostList(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "5") int size,
             @RequestParam(name = "category", required = false) Category category,
@@ -55,8 +54,8 @@ public class PostController implements PostApi {
             @RequestParam(name = "title", required = false) String title
     ) {
         return ResponseEntity.ok(
-                Response.success(
-                "게시글 목록을 조회했습니다.",
+                ApiResponse.success(
+                PostSuccessCode.POST_LIST_READ,
                 service.readPostList(page, size, category, memberId, title)
                 )
         );
@@ -67,10 +66,10 @@ public class PostController implements PostApi {
      */
     @Override
     @GetMapping("/{postId}")
-    public ResponseEntity<Response<PostResponse>> readPost(@PathVariable("postId") long id){
+    public ResponseEntity<ApiResponse<PostResponse>> readPost(@PathVariable("postId") long id){
         PostResponse post = service.readPost(id);
 
-        return ResponseEntity.ok(Response.success("게시글을 조회했습니다.", post));
+        return ResponseEntity.ok(ApiResponse.success(PostSuccessCode.POST_READ, post));
     }
 
     /**
@@ -78,12 +77,12 @@ public class PostController implements PostApi {
      */
     @Override
     @PutMapping("/{postId}")
-    public ResponseEntity<Response<Void>> updatePost(
+    public ResponseEntity<ApiResponse<PostIdResponse>> updatePost(
             @PathVariable("postId") long id,
             @RequestBody UpdatePostRequest request
     ) {
         service.updatePost(id, request.title(), request.content());
-        return ResponseEntity.ok(Response.success("ID:" + id +" 게시글이 수정되었습니다.", null));
+        return ResponseEntity.ok(ApiResponse.success(PostSuccessCode.POST_UPDATED, new PostIdResponse(id)));
 
     }
 
@@ -92,8 +91,8 @@ public class PostController implements PostApi {
      */
     @Override
     @DeleteMapping("/{postId}")
-    public ResponseEntity<Response<Void>> deletePost(@PathVariable("postId") long id) {
+    public ResponseEntity<ApiResponse<PostIdResponse>> deletePost(@PathVariable("postId") long id) {
         service.deletePost(id);
-        return ResponseEntity.status(HttpStatus.OK).body(Response.success("ID:" + id + " 게시글이 삭제되었습니다.", null));
+        return ResponseEntity.ok(ApiResponse.success(PostSuccessCode.POST_DELETED, new PostIdResponse(id)));
     }
 }

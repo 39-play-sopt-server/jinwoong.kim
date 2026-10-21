@@ -1,6 +1,5 @@
 package org.sopt.post.service;
 
-import org.sopt.like.domain.PostLike;
 import org.sopt.like.repository.PostLikeRepository;
 import org.sopt.post.dto.PostPageResponse;
 import org.sopt.post.repository.PostSpecifications;
@@ -19,14 +18,13 @@ import org.sopt.post.repository.PostRepository;
 
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 
 /**
  * CLASS: 게시글 조회·수정·삭제의 업무 흐름과 페이지네이션을 처리합니다.
  */
 @Service
 public class PostService {
-    private final PostRepository repo; // 예: Spring이 주입한 MemoryPostRepository 객체
+    private final PostRepository repo; // 예: Spring이 주입한 PostRepository 객체
     private final PostLikeRepository likes; // 예: 좋아요 집계, 삭제 저장소
     private final MemberRepository members; // 예: Spring이 주입한 MemberRepository
 
@@ -43,7 +41,7 @@ public class PostService {
      * METHOD: ID 발급과 게시글 생성을 저장소에 위임합니다.
      */
     @Transactional
-    public void createPost(
+    public Long createPost(
             String title,
             String content,
             Category category,
@@ -55,7 +53,7 @@ public class PostService {
         // members 도메인에서 id 가져오기
 
         Post post = new Post(title, content, category, member);
-        repo.save(post); // 생성자로 개시글을 만들고 save로 db에저장됨
+        return repo.save(post).getId();
     }
 
     /**
@@ -110,7 +108,7 @@ public class PostService {
      */
     @Transactional //실습: 조회와 삭제를 하나의 트랜잭션으로
     public void deletePost(long id) {
-        Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
+        Post post = repo.findForUpdate(id).orElseThrow(PostNotFoundException::new);
         likes.deleteByPost_Id(id);
         likes.flush();
         repo.delete(post);

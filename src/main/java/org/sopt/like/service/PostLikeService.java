@@ -1,6 +1,6 @@
 package org.sopt.like.service;
 
-import org.sopt.common.exception.LikeNotFoundException;
+import org.sopt.like.exception.LikeNotFoundException;
 import org.sopt.like.domain.PostLike;
 import org.sopt.like.repository.PostLikeRepository;
 import org.sopt.member.exception.MemberNotFoundException;

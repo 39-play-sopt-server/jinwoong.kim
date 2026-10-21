@@ -20,21 +20,19 @@ public record PostResponse (
     long likeCount // 예: 3L
 ) {
     /**
-     * METHOD: 게시글 객체를 잠근 상태에서 현재 값을 일관된 응답 DTO로 복사합니다.
+     * METHOD: Service 트랜잭션 안에서 게시글과 작성자 및 좋아요 수를 응답 DTO로 복사합니다.
      */
-    public static PostResponse from(Post post, long LikeCount) {
-        synchronized (post) {
-            return new PostResponse(
-                    post.getId(),
-                    post.getTitle(),
-                    post.getContent(),
-                    post.getCategory(),
-                    post.getCreatedAt(),
-                    post.getViewCount(),
-                    post.getMember().getId(),
-                    post.getMember().getName(),
-                    LikeCount
-            );
-        }
+    public static PostResponse from(Post post, long likeCount) {
+        return new PostResponse(
+                post.getId(),
+                post.getTitle(),
+                post.getContent(),
+                post.getCategory(),
+                post.getCreatedAt(),
+                post.getViewCount(),
+                post.getMember().getId(),
+                post.getMember().getName(),
+                likeCount
+        );
     }
 }

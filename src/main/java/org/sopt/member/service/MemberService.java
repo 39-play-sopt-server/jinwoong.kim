@@ -1,9 +1,9 @@
 package org.sopt.member.service;
 
+import org.sopt.member.exception.MemberErrorCode;
 import org.sopt.like.repository.PostLikeRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.sopt.common.exception.BusinessException;
-import org.sopt.common.exception.ErrorCode;
 import org.sopt.member.domain.Member;
 import org.sopt.member.dto.MemberResponse;
 import org.sopt.member.exception.MemberNotFoundException;
@@ -22,7 +22,7 @@ public class MemberService {
     private final PostRepository posts; // 예: Spring이 주입한 PostRepository
 
     /**
-     * CONTRUCTOR: 업무 처리에 필요한 저장소 또는 Service를 생성자로 주입받음
+     * CONSTRUCTOR: 업무 처리에 필요한 저장소 또는 Service를 생성자로 주입받음
      */
     public MemberService(MemberRepository members, PostRepository posts, PostLikeRepository likes) {
         this.members = members;
@@ -43,7 +43,10 @@ public class MemberService {
     public void delete(Long id) {
         Member m = members.findById(id).orElseThrow(MemberNotFoundException::new);
         if (posts.existsByMember_Id(id)) {
-            throw new BusinessException(ErrorCode.MEMBER_HAS_POSTS);
+            throw new BusinessException(MemberErrorCode.MEMBER_HAS_POSTS);
+        }
+        if (likes.existsByMember_Id(id)) {
+            throw new BusinessException(MemberErrorCode.MEMBER_HAS_LIKES);
         }
         members.delete(m);
         members.flush();
