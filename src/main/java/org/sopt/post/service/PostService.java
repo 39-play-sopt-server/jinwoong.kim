@@ -1,6 +1,7 @@
 package org.sopt.post.service;
 
 import org.sopt.post.dto.PostPageResponse;
+import org.sopt.post.repository.PostSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -65,12 +66,12 @@ public class PostService {
     }
 
     /**
-     * METHOD: 입력을 검증하고 생성일 ID 내림추산으로 게시글을 DB페이지 조회합니다.
+     * METHOD: 입력을 검증하고 생성일 ID 내림추산으로 게시글을 DB페이지 조회합니다 + 동적 검색으로 여러 조건을 필터링합니다.
      * 범위를 벗어난 페이지는 빈 목록을 반환하며, 조회수는 증가시키지 않습니다.
      * Category 로 페이지 목록을 구분지어 읽어옵니다.
      */
     @Transactional(readOnly = true)
-    public PostPageResponse readPostList(int page, int size, Category cat) {
+    public PostPageResponse readPostList(int page, int size, Category cat, Long memberId, String title) {
         if (page < 0 || size < 1 || size > 100) {
             throw new IllegalArgumentException("페이지는 0 이상, 사이즈는 1~100입니다.");
         }
@@ -79,8 +80,11 @@ public class PostService {
                 size,
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
         );
+        if (memberId != null && memberId <= 0) {
+            throw new IllegalArgumentException("작성자 ID는 양수여야 합니다.");
+        }
 
-        Page<Post> result = cat == null ? repo.findAll(pageable) : repo.findByCategory(cat, pageable);
+        Page<Post> result = repo.findAll(PostSpecifications.filter(memberId, cat, title), pageable);
 
         return PostPageResponse.from(result.map(PostResponse::from));
     }

@@ -50,12 +50,14 @@ public class PostController implements PostApi {
     public ResponseEntity<Response<PostPageResponse>> readPostList(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "5") int size,
-            @RequestParam(name = "category", required = false) Category category
+            @RequestParam(name = "category", required = false) Category category,
+            @RequestParam(name = "memberId", required = false) Long memberId,
+            @RequestParam(name = "title", required = false) String title
     ) {
         return ResponseEntity.ok(
                 Response.success(
                 "게시글 목록을 조회했습니다.",
-                service.readPostList(page, size, category)
+                service.readPostList(page, size, category, memberId, title)
                 )
         );
     }
