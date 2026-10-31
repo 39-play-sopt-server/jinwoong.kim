@@ -5,7 +5,7 @@ package org.sopt.common.exception;
  */
 public class BusinessException extends RuntimeException {
 
-    private final ErrorCode errorCode; // 예: ErrorCode.POST_NOT_FOUND
+    private final ErrorCode errorCode; // 예: 게시글 또는 회원 도메인의 오류 코드
 
     /**
      * CONSTRUCTOR: 오류 코드를 보관하고, 해당 코드의 기본 메시지를 예외 메시지로 설정합니다.

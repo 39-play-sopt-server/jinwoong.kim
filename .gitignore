@@ -43,3 +43,7 @@ bin/
 .DS_Store
 .codex/
 .claude/
+
+# Personal study pages
+/for_personal_study/
+.env
