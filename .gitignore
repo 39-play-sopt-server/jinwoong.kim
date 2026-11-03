@@ -47,3 +47,7 @@ bin/
 # Personal study pages
 /for_personal_study/
 .env
+/SERVER_STATUS.md
+
+# docker
+/.env.docker.local
