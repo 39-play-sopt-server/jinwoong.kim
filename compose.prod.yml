@@ -2,7 +2,7 @@ name: sopt-assignment #Compose 프로젝트 이름을 고정
 
 services:
   app:
-    image: sopt-assignment:ec2
+    image: sopt-assignment:${IMAGE_TAG:-ec2}
     env_file: #EC2에 작성한 운영 DB CORS 설정사용
       - /home/ubuntu/assignment-deploy/.env
     restart: unless-stopped
