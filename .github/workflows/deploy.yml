@@ -1,0 +1,223 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-test-password
+          MYSQL_ROOT_HOST: "%"
+          MYSQL_DATABASE: assignment_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=30s
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Test and build
+        env:
+          TEST_DB_PASSWORD: ci-test-password
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/assignment_test
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: ci-test-password
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build --no-daemon
+
+      - name: Build Docker image
+        run: |
+          docker build --platform linux/amd64 \
+            -t sopt-assignment:${GITHUB_SHA} .
+
+      - name: Save Docker image
+        run: |
+          set -o pipefail
+          docker save sopt-assignment:${GITHUB_SHA} \
+            | gzip > /tmp/sopt-assignment-image.tar.gz
+
+      - name: Configure SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Check EC2 connection
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            "$EC2_USER@$EC2_HOST" \
+            'test -d /home/ubuntu/assignment-deploy &&
+             sudo -n docker info > /dev/null'
+
+      - name: Transfer Docker image
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            /tmp/sopt-assignment-image.tar.gz \
+            "$EC2_USER@$EC2_HOST:/home/ubuntu/assignment-deploy/image-${GITHUB_SHA}.tar.gz"
+
+      - name: Transfer Compose configuration
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            compose.prod.yml \
+            "$EC2_USER@$EC2_HOST:/home/ubuntu/assignment-deploy/compose-${GITHUB_SHA}.yml"
+
+      - name: Load image and validate configuration
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            "$EC2_USER@$EC2_HOST" \
+            bash -s -- "$GITHUB_SHA" <<'REMOTE'
+          set -euo pipefail
+
+          IMAGE_TAG="$1"
+          cd /home/ubuntu/assignment-deploy
+
+          sudo -n docker load -i "image-${IMAGE_TAG}.tar.gz"
+
+          sudo -n env IMAGE_TAG="$IMAGE_TAG" \
+            docker compose -f "compose-${IMAGE_TAG}.yml" config --quiet
+
+          sudo -n docker image inspect \
+            "sopt-assignment:${IMAGE_TAG}" > /dev/null
+          REMOTE
+
+
+      - name: Deploy Spring container
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            "$EC2_USER@$EC2_HOST" \
+            bash -s -- "$GITHUB_SHA" <<'REMOTE'
+          set -euo pipefail
+
+          IMAGE_TAG="$1"
+          cd /home/ubuntu/assignment-deploy
+
+          APP_ID=$(sudo -n docker compose -f compose.prod.yml ps -q app)
+          test -n "$APP_ID"
+
+          OLD_IMAGE=$(sudo -n docker inspect --format '{{.Image}}' "$APP_ID")
+          sudo -n docker image tag "$OLD_IMAGE" sopt-assignment:rollback
+          cp compose.prod.yml compose.rollback.yml
+
+          wait_for_app() {
+            for attempt in $(seq 1 30); do
+              if sudo -n docker compose -f compose.prod.yml \
+                run --rm --no-deps --entrypoint wget nginx \
+                -q -T 5 -O /dev/null \
+                http://app:8080/swagger-ui/index.html; then
+                return 0
+              fi
+              sleep 3
+            done
+            return 1
+          }
+
+          reload_and_check() {
+            sudo -n docker compose -f compose.prod.yml exec -T nginx nginx -t || return 1
+            sudo -n docker compose -f compose.prod.yml exec -T nginx nginx -s reload || return 1
+            curl --fail --silent --show-error \
+              --retry 10 --retry-delay 3 --retry-all-errors \
+              --connect-timeout 5 --max-time 10 \
+              --resolve jinwoong-sopt39.p-e.kr:443:127.0.0.1 \
+              -o /dev/null \
+              https://jinwoong-sopt39.p-e.kr/swagger-ui/index.html
+          }
+
+          rollback() {
+            trap - ERR
+            echo "Deployment failed. Restoring previous image."
+            set +e
+            cp compose.rollback.yml compose.prod.yml
+            # Restore the default tag as well, including for older Compose files.
+            sudo -n docker image tag "$OLD_IMAGE" sopt-assignment:ec2
+            if sudo -n env IMAGE_TAG=rollback \
+              docker compose -f compose.prod.yml \
+              up -d --no-deps --pull never --force-recreate app \
+              && wait_for_app && reload_and_check; then
+              echo "Previous service restored and HTTPS verified."
+            else
+              echo "Rollback verification failed. Manual recovery required."
+            fi
+            exit 1
+          }
+
+          trap rollback ERR
+          cp "compose-${IMAGE_TAG}.yml" compose.prod.yml
+
+          sudo -n env IMAGE_TAG="$IMAGE_TAG" \
+            docker compose -f compose.prod.yml \
+            up -d --no-deps --pull never --force-recreate app
+
+          wait_for_app
+          reload_and_check
+
+          sudo -n docker image tag "sopt-assignment:${IMAGE_TAG}" sopt-assignment:ec2
+          trap - ERR
+          echo "Deployment completed and HTTPS verified."
+          REMOTE
+
+      - name: Remove SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/deploy_key ~/.ssh/known_hosts

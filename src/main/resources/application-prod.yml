@@ -1,0 +1,9 @@
+# Nginx를 거쳐서만 접근하는 운영 배포에서 사용한다.
+server:
+  address: 0.0.0.0
+  port: 8080
+  forward-headers-strategy: framework
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}

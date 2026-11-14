@@ -1,0 +1,14 @@
+services:
+  app: # 앞서 만든 Spring이미지로 실행할 서비서
+    image: sopt-assignment:local
+    env_file: # DB CORS 환경변수 전달
+      - .env.docker.local
+
+  nginx: # 공식 Nginx이미지로 실행할 서비스
+    image: nginx:stable-alpine
+    ports: # 맥의 8082번을 Nginx의 80번에 연결
+      - "127.0.0.1:8082:80"
+    volumes: # 작성한 설정 파일을 Nginx 컨테이너에 연결
+      - ./deploy/nginx/local.conf:/etc/nginx/conf.d/default.conf:ro # 컨테이너에서 해당 파일을 읽기전용으로 사용
+    depends_on: # app을 먼저 시작한 뒤 Nginx 시작
+      - app
