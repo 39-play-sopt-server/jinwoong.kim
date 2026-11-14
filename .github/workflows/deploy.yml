@@ -75,6 +75,15 @@ jobs:
           printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
           printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
+      - name: Validate SSH private key
+        run: |
+          if ! ssh-keygen -y -P '' -f ~/.ssh/deploy_key > ~/.ssh/deploy_key.pub; then
+            echo '::error::EC2_SSH_KEY must contain a complete private key without a passphrase.'
+            exit 1
+          fi
+          echo 'Deployment public key fingerprint (compare with your local key):'
+          ssh-keygen -lf ~/.ssh/deploy_key.pub -E sha256
+
       - name: Check EC2 connection
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -82,6 +91,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=10 \
             "$EC2_USER@$EC2_HOST" \
@@ -220,4 +230,4 @@ jobs:
 
       - name: Remove SSH credentials
         if: always()
-        run: rm -f ~/.ssh/deploy_key ~/.ssh/known_hosts
+        run: rm -f ~/.ssh/deploy_key ~/.ssh/deploy_key.pub ~/.ssh/known_hosts
