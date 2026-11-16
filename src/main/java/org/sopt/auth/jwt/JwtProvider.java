@@ -1,16 +1,18 @@
 package org.sopt.auth.jwt;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import java.util.Date;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * CLASS: JWT 발급과 서명·만료 검증 및 회원 ID 추출을 담당합니다.
+ * CLASS: JWT 발급과 서명·만료 검증 및 회원 ID 추출을 담당
  */
 @Component
 public class JwtProvider {
@@ -18,41 +20,88 @@ public class JwtProvider {
     private final SecretKey secretKey; // JWT 서명 생성과 검증에 사용하는 비밀키
     private final long accessTokenExpiration; // 예: 1800000밀리초 = 30분의 유효 기간
 
+    private final long refreshTokenExpiration; // Refresh Token의 유효 기간, 밀리초 단위
+
     /**
-     * CONSTRUCTOR: 설정의 Base64 비밀키를 서명용 키로 변환하고 유효 기간을 초기화합니다.
+     * CONSTRUCTOR: 설정의 Base64 비밀키를 서명용 키로 변환하고 유효 기간을 초기화
+     * Lombok쓰지 않은 이융는 Base64 문자열을 SecretKey로 변환하는 초기화 작업을 하기때문에.
      */
     public JwtProvider(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.access-token-expiration}") long accessTokenExpiration
+            @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
+            @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration
     ) {
         this.secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.accessTokenExpiration = accessTokenExpiration;
+        this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
     /**
-     * METHOD: 회원 ID를 subject에 담고 발급·만료 시각을 설정한 Access Token을 생성합니다.
+     * METHOD: Access Token을 검증하고 회원 ID를 반환
+     */
+    public Long getMemberId(String token) {
+        return getMemberId(token, TokenType.ACCESS);
+    }
+
+    /**
+     * METHOD: Refresh Token을 검증하고 회원 ID를 반환합니다
+     */
+    public Long getRefreshMemberId(String token) {
+        return getMemberId(token, TokenType.REFRESH);
+    }
+
+    /**
+     * METHOD: 서명, 만료, 토큰 종류를 검증한 뒤 회원 ID를 반환
+     */
+    private Long getMemberId(String token, TokenType expectedType) {
+        // 1. JWT의 서명과 만료를 검증하고 클레임을 가져옴
+        Claims claims = Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        // 2. 실제 토큰 종류가 사용하려는 목적과 일치하는지 확인
+        String tokenType = claims.get("tokenType", String.class);
+        if (!expectedType.name().equals(tokenType)) {
+            throw new JwtException("토큰의 종류가 올바르지 않습니다.");
+        }
+
+        // 3. 토큰에 저장된 회원 ID를 반환
+        return Long.valueOf(claims.getSubject());
+    }
+
+    /**
+     * METHOD: 일반 API 접근에 사용할 AccessToken 을 생성
      */
     public String createAccessToken(Long memberId) {
+        return createToken(memberId, TokenType.ACCESS, accessTokenExpiration);
+    }
+
+    /**
+     * METHOD: Access Token 재발급에 사용할 Refresh Token을 생성
+     */
+    public String createRefreshToken(Long memberId) {
+        return createToken(memberId, TokenType.REFRESH, refreshTokenExpiration);
+    }
+
+    /**
+     * METHOD: 회원 ID, 토큰 종류와 유효 기간을 받아 서명된 JWT를 생성합니다.
+     */
+    private String createToken(
+            Long memberId,
+            TokenType tokenType,
+            long expiration
+    ) {
         Date now = new Date();
 
         return Jwts.builder()
-                .subject(String.valueOf(memberId)) // 예: 회원 ID 1L을 문자열 "1"로 저장
-                .issuedAt(now) // 토큰을 발급한 시각
-                .expiration(new Date(now.getTime() + accessTokenExpiration)) // 발급 시각 + 유효 기간
-                .signWith(secretKey) // 내용의 변조 여부를 검증할 수 있도록 서명
-                .compact(); // 헤더.페이로드.서명 형식의 문자열로 변환
-    }
-
-    /**
-     * METHOD: JWT의 서명과 만료를 검증한 뒤 subject의 회원 ID를 Long으로 반환합니다.
-     */
-    public Long getMemberId(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(secretKey) // 발급에 사용한 비밀키로 서명을 검증하도록 설정
-                .build()
-                .parseSignedClaims(token) // 서명이 잘못되거나 만료된 토큰이면 예외 발생
-                .getPayload(); // 검증을 통과한 토큰의 클레임을 가져옴
-
-        return Long.valueOf(claims.getSubject());
+                .subject(String.valueOf(memberId)) // 토큰의 주인인 회원 ID
+                .claim("tokenType", tokenType.name()) // ACCESS또는 REFRESH
+                .id(UUID.randomUUID().toString()) // 개별 토큰의 고유 식별자
+                .issuedAt(now) // 발급 시각
+                .expiration(new Date(now.getTime() + expiration)) // 만료 시간
+                .signWith(secretKey) // 비밀키로 서명
+                .compact(); // JWT 문자열로 변환
     }
 }
