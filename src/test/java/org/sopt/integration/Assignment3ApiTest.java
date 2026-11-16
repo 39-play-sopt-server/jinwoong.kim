@@ -5,6 +5,7 @@ import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.sopt.auth.jwt.JwtProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -34,6 +35,10 @@ class Assignment3ApiTest {
     private int port;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private JwtProvider jwtProvider;
+
+    private String accessToken; // 예: 현재 API 테스트 요청에 사용할 유효한 JWT
 
     private final List<Long> memberIds = new ArrayList<>(); // 예: 테스트 후 정리할 회원 ID
     private final String prefix = "api-" + UUID.randomUUID(); // 예: 다른 실행과 구분할 제목
@@ -43,8 +48,10 @@ class Assignment3ApiTest {
      * METHOD: 개발 DB에 테스트 데이터를 쓰지 않도록 실제 연결된 DB를 확인합니다.
      */
     @BeforeEach
-    void checkDatabase() {
+    void checkDatabase() throws Exception {
         assertEquals("assignment_test", jdbc.queryForObject("SELECT DATABASE()", String.class));
+        long memberId = createMember("API 인증 회원");
+        accessToken = jwtProvider.createAccessToken(memberId);
     }
 
     /**
@@ -190,7 +197,7 @@ class Assignment3ApiTest {
      */
     @Test
     void invalidInputReturnsClientErrors() throws Exception {
-        assertStatus(400, request("POST", "/members", "{\"name\":\"  \"}"));
+        assertStatus(400, request("POST", "/auth/signup", signupBody("  ")));
         long author = createMember("검증 회원");
         assertStatus(400, request("POST", "/posts",
                 "{\"title\":\" \",\"content\":\"본문\",\"category\":\"GENERAL\",\"memberId\":" + author + "}"));
@@ -214,7 +221,7 @@ class Assignment3ApiTest {
 
         var badId = assertStatus(400, request("GET", "/posts/not-a-number", null));
         assertEquals("INVALID_PARAMETER_TYPE", badId.read("$.code"));
-        var badJson = assertStatus(400, request("POST", "/members", "{"));
+        var badJson = assertStatus(400, request("POST", "/auth/signup", "{"));
         assertEquals("INVALID_REQUEST_BODY", badJson.read("$.code"));
 
         long member = createMember("메서드 확인 회원");
@@ -223,9 +230,10 @@ class Assignment3ApiTest {
         assertEquals("METHOD_NOT_ALLOWED", wrongMethod.read("$.code"));
         assertTrue(methodResponse.headers().firstValue("Allow").orElseThrow().contains("DELETE"));
 
-        var unsupported = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/members"))
+        var unsupported = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/auth/signup"))
                 .timeout(Duration.ofSeconds(20))
                 .header("Content-Type", "text/plain")
+                .header("Authorization", "Bearer " + accessToken)
                 .POST(HttpRequest.BodyPublishers.ofString("plain text"))
                 .build();
         var media = assertStatus(415, client.send(unsupported, HttpResponse.BodyHandlers.ofString()));
@@ -233,28 +241,16 @@ class Assignment3ApiTest {
     }
 
     /**
-     * METHOD: JSON을 거부한 생성 요청은 데이터 저장 전에 406으로 거절하는지 검증합니다.
+     * METHOD: JSON을 거부한 게시글 생성 요청은 데이터 저장 전에 406으로 거절하는지 검증합니다.
      */
     @Test
     void unsupportedAcceptDoesNotCreateResources() throws Exception {
-        String memberName = prefix + "-accept";
-        var memberRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/members"))
-                .timeout(Duration.ofSeconds(20))
-                .header("Accept", "text/plain").header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"" + memberName + "\"}"))
-                .build();
-        var response = client.send(memberRequest, HttpResponse.BodyHandlers.ofString());
-        // 실패하더라도 테스트가 만든 회원만 정리할 수 있도록 ID를 기록합니다.
-        memberIds.addAll(jdbc.queryForList("SELECT id FROM member WHERE name = ?", Long.class, memberName));
-        assertEquals(406, response.statusCode());
-        assertTrue(response.body().isEmpty());
-        assertTrue(memberIds.isEmpty(), "거절된 요청으로 회원이 저장되면 안 됩니다.");
-
         long author = createMember("Accept 테스트 회원");
         String title = prefix + "-rejected-post";
         var postRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/posts"))
                 .timeout(Duration.ofSeconds(20))
                 .header("Accept", "text/plain").header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + accessToken)
                 .POST(HttpRequest.BodyPublishers.ofString("{\"title\":\"" + title
                         + "\",\"content\":\"본문\",\"category\":\"GENERAL\",\"memberId\":" + author + "}"))
                 .build();
@@ -284,14 +280,15 @@ class Assignment3ApiTest {
     @Test
     void swaggerDocumentsEveryDomainAndResponse() throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/v3/api-docs"))
-                .timeout(Duration.ofSeconds(20)).GET().build();
+                .timeout(Duration.ofSeconds(20))
+                .header("Authorization", "Bearer " + accessToken).GET().build();
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, response.statusCode(), response.body());
         var doc = JsonPath.parse(response.body());
-        assertEquals("MEMBER", doc.read("$.paths['/api/v1/members'].post.tags[0]"));
+        assertEquals("MEMBER", doc.read("$.paths['/api/v1/members/{memberId}'].delete.tags[0]"));
         assertEquals("POST", doc.read("$.paths['/api/v1/posts'].post.tags[0]"));
         assertEquals("LIKE", doc.read("$.paths['/api/v1/posts/{postId}/likes/{memberId}'].put.tags[0]"));
-        assertNotNull(doc.read("$.paths['/api/v1/members'].post.summary"));
+        assertNotNull(doc.read("$.paths['/api/v1/auth/signup'].post"));
         assertNotNull(doc.read("$.paths['/api/v1/members/{memberId}'].delete.responses['409']"));
         assertNotNull(doc.read("$.paths['/api/v1/posts'].post.responses['201']"));
         assertNotNull(doc.read("$.paths['/api/v1/posts'].post.responses['406']"));
@@ -302,10 +299,18 @@ class Assignment3ApiTest {
      * METHOD: 회원을 HTTP로 생성하고 정리할 ID를 기록합니다.
      */
     private long createMember(String name) throws Exception {
-        var response = assertStatus(201, request("POST", "/members", "{\"name\":\"" + name + "\"}"));
+        var response = assertStatus(201, request("POST", "/auth/signup", signupBody(name)));
         long id = number(response, "$.data.id");
         memberIds.add(id);
         return id;
+    }
+
+    /**
+     * METHOD: 이메일 중복을 피하도록 고유한 회원가입 요청 본문을 만듭니다.
+     */
+    private String signupBody(String name) {
+        return "{\"name\":\"" + name + "\",\"email\":\"" + UUID.randomUUID()
+                + "@example.com\",\"password\":\"test-password\"}";
     }
 
     /**
@@ -328,6 +333,9 @@ class Assignment3ApiTest {
     private HttpResponse<String> request(String method, String path, String body) throws Exception {
         var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .timeout(Duration.ofSeconds(20)).header("Content-Type", "application/json");
+        if (accessToken != null) {
+            builder.header("Authorization", "Bearer " + accessToken);
+        }
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }

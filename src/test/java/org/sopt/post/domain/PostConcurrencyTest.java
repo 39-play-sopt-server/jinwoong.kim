@@ -11,6 +11,7 @@ import org.sopt.post.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
@@ -39,6 +40,8 @@ class PostConcurrencyTest {
     private PostRepository posts;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private Long memberId; // 예: 이 테스트가 생성한 회원 ID
     private Long postId; // 예: 이 테스트가 생성한 게시글 ID
@@ -49,7 +52,11 @@ class PostConcurrencyTest {
     @BeforeEach
     void setUp() {
         assertEquals("assignment_test", jdbc.queryForObject("SELECT DATABASE()", String.class));
-        Member member = members.saveAndFlush(new Member("조회수 테스트 회원"));
+        Member member = members.saveAndFlush(new Member(
+                "조회수 테스트 회원",
+                "view-test@example.com",
+                passwordEncoder.encode("test-password")
+        ));
         memberId = member.getId();
         Post post = posts.saveAndFlush(new Post("조회수 테스트", "테스트 본문", Category.GENERAL, member));
         postId = post.getId();
