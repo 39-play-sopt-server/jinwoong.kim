@@ -92,4 +92,26 @@ public class AuthController {
          * }
          */
     }
+
+    /**
+     * METHOD: 쿠키의 Refresh Token을 검증하고 새 Access Token을 전달합니다.
+     */
+    @PostMapping("/reissue")
+    public ResponseEntity<ApiResponse<Void>> reissue(
+            @CookieValue(name = "refreshToken", required = false)
+            String refreshToken
+    ) {
+        // 1. 쿠키로 받은 토큰을 검증하고 새 Access Token을 발급받습니다.
+        String accessToken = authService.reissue(refreshToken);
+
+        // 2. 새 Access Token을 Authorization 응답 헤더로 전달합니다.
+        return ResponseEntity
+                .ok()
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .body(ApiResponse.<Void>success(
+                        AuthSuccessCode.TOKEN_REISSUED,
+                        null
+                ));
+    }
+
 }
