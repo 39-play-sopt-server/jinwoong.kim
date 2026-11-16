@@ -8,6 +8,8 @@ import io.jsonwebtoken.security.Keys;
 import java.util.Date;
 import java.util.UUID;
 import javax.crypto.SecretKey;
+
+import org.sopt.auth.dto.TokenPair;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -54,21 +56,36 @@ public class JwtProvider {
      * METHOD: 서명, 만료, 토큰 종류를 검증한 뒤 회원 ID를 반환
      */
     private Long getMemberId(String token, TokenType expectedType) {
-        // 1. JWT의 서명과 만료를 검증하고 클레임을 가져옴
+        Claims claims = parseClaims(token, expectedType);
+        return Long.valueOf(claims.getSubject());
+    }
+
+    /**
+     * METHOD: Refresh Token을 검증하고 저장에 필요한 클레임을 반환
+     */
+    public Claims getRefreshClaims(String token) {
+        return parseClaims(token, TokenType.REFRESH);
+    }
+
+    /**
+     * METHOD: 서명, 만료와 토큰 종류를 검증한 뒤 클레임을 반환
+     */
+    private Claims parseClaims(String token, TokenType expectedType) {
+        // 1. 서명과 만료를 검증
         Claims claims = Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
 
-        // 2. 실제 토큰 종류가 사용하려는 목적과 일치하는지 확인
+        // 2. 사용 목적에 맞는 토큰인지 확인
         String tokenType = claims.get("tokenType", String.class);
+
         if (!expectedType.name().equals(tokenType)) {
             throw new JwtException("토큰의 종류가 올바르지 않습니다.");
         }
 
-        // 3. 토큰에 저장된 회원 ID를 반환
-        return Long.valueOf(claims.getSubject());
+        return claims;
     }
 
     /**
