@@ -5,14 +5,13 @@ import org.sopt.like.repository.PostLikeRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.sopt.common.exception.BusinessException;
 import org.sopt.member.domain.Member;
-import org.sopt.member.dto.MemberResponse;
 import org.sopt.member.exception.MemberNotFoundException;
 import org.sopt.member.repository.MemberRepository;
 import org.sopt.post.repository.PostRepository;
 import org.springframework.stereotype.Service;
 
 /**
- * CLASS: 회원 생성과 탈퇴 조건 검증 및 삭제의 업무 흐름을 처리
+ * CLASS: 회원 탈퇴 조건 검증 및 삭제의 업무 흐름을 처리
  */
 @Service
 @Transactional
@@ -28,13 +27,6 @@ public class MemberService {
         this.members = members;
         this.posts = posts;
         this.likes = likes;
-    }
-
-    /**
-     * METHOD: 이름을 검증해 회원을 저장하고 저장된 회원 정보를 반환
-     */
-    public MemberResponse create(String name) {
-        return MemberResponse.from(members.save(new Member(name)));
     }
 
     /**
