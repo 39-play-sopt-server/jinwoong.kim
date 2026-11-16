@@ -45,7 +45,15 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // 4. /api/v1/auth/** 전체는 인증 없이 허용하고 나머지 경로는 인증 필요
                 .authorizeHttpRequests(auth -> auth
+                        // 회원가입 등 인증 API는 인증 없이 접근 허용
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        // 배포 확인에 사용하는 Swagger 화면과 문서 접근 허용
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**"
+                        ).permitAll()
+                        // 나머지 API는 인증 필요
                         .anyRequest().authenticated())
                 // 5. 인증 없이 보호된 경로에 접근하면 401 응답
                 .exceptionHandling(e -> e
