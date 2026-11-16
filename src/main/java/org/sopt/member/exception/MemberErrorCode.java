@@ -9,6 +9,9 @@ import org.springframework.http.HttpStatus;
 public enum MemberErrorCode implements ErrorCode {
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 회원입니다."),
 
+    // 회원가입 시 이미 사용 중인 이메일이면 409 Conflict로 응답합니다.
+    EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
+
     MEMBER_HAS_POSTS(HttpStatus.CONFLICT, "게시글을 먼저 삭제해주세요."),
 
     MEMBER_HAS_LIKES(HttpStatus.CONFLICT, "좋아요를 먼저 취소해주세요.");
