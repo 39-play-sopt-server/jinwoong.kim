@@ -9,3 +9,7 @@ spring:
       ddl-auto: update
     open-in-view: false
     show-sql: false
+
+# 테스트 전용 서명 키; 운영 환경의 JWT_SECRET 없이도 테스트 컨텍스트를 구성합니다.
+jwt:
+  secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=

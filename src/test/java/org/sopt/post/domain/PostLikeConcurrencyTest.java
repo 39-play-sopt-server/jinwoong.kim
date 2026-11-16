@@ -13,6 +13,7 @@ import org.sopt.post.repository.PostRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
@@ -41,6 +42,9 @@ public class PostLikeConcurrencyTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private Long memberId; // 예: 테스트에서 생성한 회원 ID
     private Long postId; // 예: 테스트에서 생성한 개시글 ID
 
@@ -50,7 +54,11 @@ public class PostLikeConcurrencyTest {
     @BeforeEach
     void setUp() {
         assertEquals("assignment_test", jdbc.queryForObject("SELECT DATABASE()", String.class));
-        Member member = members.saveAndFlush(new Member("동시성 테스트 회원"));
+        Member member = members.saveAndFlush(new Member(
+                "동시성 테스트 회원",
+                "like-test@example.com",
+                passwordEncoder.encode("test-password")
+        ));
         memberId = member.getId();
 
         Post post = posts.saveAndFlush(
