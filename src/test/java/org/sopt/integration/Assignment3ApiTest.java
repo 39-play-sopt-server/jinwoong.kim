@@ -51,7 +51,7 @@ class Assignment3ApiTest {
     void checkDatabase() throws Exception {
         assertEquals("assignment_test", jdbc.queryForObject("SELECT DATABASE()", String.class));
         long memberId = createMember("API 인증 회원");
-        accessToken = jwtProvider.createAccessToken(memberId);
+        accessToken = jwtProvider.createAccessToken(memberId, 0L);
     }
 
     /**
