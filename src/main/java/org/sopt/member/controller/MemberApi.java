@@ -8,7 +8,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.sopt.common.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-
+import java.util.List;
+import org.sopt.member.dto.MemberResponse;
 
 /**
  * INTERFACE: 회원 삭제 계약과 Swagger 문서를 정의합니다.
@@ -32,4 +33,13 @@ public interface MemberApi {
 
     // AuthenticationPrincipal로 바꾼이유:
     // @PathVariable은 사용자가 URL에 지정한 값을 가져오고, @AuthenticationPrincipal은 서버가 인증한 현재 사용자의 정보를 가져와서
+
+    /**
+     * METHOD: 관리자 전용 전체 회원 목록 조회 계약
+     */
+    @Operation(
+            summary = "전체 회원 목록 조회",
+            description = "ROLE_ADMIN 권한을 가진 관리자만 조회 가능"
+    )
+    ResponseEntity<ApiResponse<List<MemberResponse>>> readAll();
 }
