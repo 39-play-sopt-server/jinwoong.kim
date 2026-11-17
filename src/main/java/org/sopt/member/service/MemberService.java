@@ -11,6 +11,8 @@ import org.sopt.post.repository.PostRepository;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import org.sopt.auth.repository.RefreshTokenRepository;
+import java.util.List;
+import org.sopt.member.dto.MemberResponse;
 
 /**
  * CLASS: 회원 탈퇴 조건 검증 및 삭제의 업무 흐름을 처리
@@ -48,5 +50,16 @@ public class MemberService {
         // 5. 회원을 삭제하고 DB에 반영
         members.delete(member);
         members.flush();
+    }
+
+    /**
+     * METHOD: 전체 회원을 조회하고 응답 DTO 목록으로 변환
+     */
+    @Transactional(readOnly = true)
+    public List<MemberResponse> readAll() {
+        return members.findAll()
+                .stream()
+                .map(MemberResponse::from)
+                .toList();
     }
 }
