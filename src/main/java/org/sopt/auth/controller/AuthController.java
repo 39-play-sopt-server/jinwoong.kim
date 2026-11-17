@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import org.sopt.auth.cookie.RefreshTokenCookie;
 import org.sopt.auth.dto.TokenPair;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 /**
  * CLASS: 회원가입 HTTP 요청을 AuthService에 위임하고 응답을 반환합니다.
@@ -110,6 +111,26 @@ public class AuthController {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .body(ApiResponse.<Void>success(
                         AuthSuccessCode.TOKEN_REISSUED,
+                        null
+                ));
+    }
+
+    /**
+     * METHOD: 인증된 회원의 Refresh Token 기록을 삭제하고 쿠키를 만료 시킴
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @AuthenticationPrincipal Long memberId //@AuthenticationPrincipal은 인증 정보에서 사용자를 꺼내줌
+    ) {
+        // 1. 현재 인증된 회원의 Refresh Token 기록을 모두 삭제
+        authService.logout(memberId);
+
+        // 2. 현재 클라이언트의 Refresh Token 쿠키를 만료 시킴
+        return ResponseEntity
+                .ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear())
+                .body(ApiResponse.<Void>success(
+                        AuthSuccessCode.LOGOUT_SUCCESS,
                         null
                 ));
     }
