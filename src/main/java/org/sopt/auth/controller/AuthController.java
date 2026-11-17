@@ -17,8 +17,14 @@ import org.sopt.auth.cookie.RefreshTokenCookie;
 import org.sopt.auth.dto.TokenPair;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+// CSRF
+import org.springframework.http.CacheControl;
+import org.springframework.security.web.csrf.CsrfToken;
+
 /**
  * CLASS: 회원가입 HTTP 요청을 AuthService에 위임하고 응답을 반환합니다.
+ * - GET 같은 조회 요청: CSRF 검사 안 함
+ * - POST·PUT·PATCH·DELETE 같은 변경 요청: CSRF 검사함
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -135,4 +141,17 @@ public class AuthController {
                 ));
     }
 
+
+    // CSRF
+    /**
+     * METHOD: 상태 변경 요청에 사용할 CSRF 토큰을 응답 헤더로 전달
+     */
+    @GetMapping("/csrf")
+    public ResponseEntity<Void> csrf(CsrfToken csrfToken) {
+        return ResponseEntity
+                .ok()
+                .cacheControl(CacheControl.noStore())
+                .header(csrfToken.getHeaderName(), csrfToken.getToken())
+                .build();
+    }
 }
