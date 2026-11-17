@@ -21,6 +21,16 @@ public enum AuthErrorCode implements ErrorCode {
     INVALID_REFRESH_TOKEN(
             HttpStatus.UNAUTHORIZED,
         "유효하지 않은 Refresh Token입니다."
+    ),
+
+    SOCIAL_EMAIL_CONFLICT(
+            HttpStatus.CONFLICT,
+            "이미 가입된 이메일입니다. 기존 로그인 방식을 이용해 주세요."
+    ),
+
+    SOCIAL_LOGIN_FAILED(
+            HttpStatus.UNAUTHORIZED,
+            "소셜 로그인에 실패했습니다. 다시 시도해 주세요."
     );
 
     private final HttpStatus status; // 예: 인증 실패 시 401
