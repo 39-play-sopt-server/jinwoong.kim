@@ -1,29 +1,39 @@
 package org.sopt.auth.controller;
 
 import java.net.URI;
+
+import lombok.RequiredArgsConstructor;
+import org.sopt.auth.dto.LoginRequest;
 import org.sopt.auth.dto.SignupRequest;
 import org.sopt.auth.service.AuthService;
 import org.sopt.common.response.ApiResponse;
 import org.sopt.member.controller.MemberSuccessCode;
 import org.sopt.member.dto.MemberResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.sopt.auth.cookie.RefreshTokenCookie;
+import org.sopt.auth.dto.TokenPair;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+
+// CSRF
+import org.springframework.http.CacheControl;
+import org.springframework.security.web.csrf.CsrfToken;
+
 /**
  * CLASS: 회원가입 HTTP 요청을 AuthService에 위임하고 응답을 반환합니다.
+ * - GET 같은 조회 요청: CSRF 검사 안 함
+ * - POST·PUT·PATCH·DELETE 같은 변경 요청: CSRF 검사함
  */
 @RestController
 @RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService; // 예: Spring이 주입한 회원가입 업무 처리 객체
 
-    /**
-     * CONSTRUCTOR: 회원가입을 처리할 AuthService를 생성자로 주입받습니다.
-     */
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
+    private final RefreshTokenCookie refreshTokenCookie; // Refresh Token 을 전달할 쿠키 생성 객체
 
     /**
      * METHOD: 가입 정보를 전달하고 비밀번호를 제외한 회원 정보와 201 응답을 반환합니다.
@@ -45,5 +55,103 @@ public class AuthController {
                         MemberSuccessCode.MEMBER_CREATED,
                         member
                 ));
+    }
+
+    /**
+     * METHOD: 로그인 성공 시 Access Token을 Authorization 응답 헤더로 전달
+     */
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<Void>> login(
+            @RequestBody LoginRequest request
+    ) {
+        // 1. 이메일과 비밀번호를 검증하고 두토큰을 발급받음
+        TokenPair tokens = authService.login(
+                request.email(),
+                request.password()
+        );
+
+        // 2. Refresh Token을 담을 쿠키 문자열
+        String cookie = refreshTokenCookie.create(tokens.getRefreshToken());
+
+        // 3. Access token 과 Refresh Token 쿠키를 응답 헤더에 담음
+        return ResponseEntity
+                .ok()
+                .header(HttpHeaders.AUTHORIZATION,
+                        "Bearer " + tokens.getAccessToken()
+                )
+                .header(HttpHeaders.SET_COOKIE, cookie)
+                .body(ApiResponse.<Void>success(
+                        AuthSuccessCode.LOGIN_SUCCESS,
+                        null
+                ));
+
+        /*
+         * 응답 헤더:
+         * Authorization: Bearer {Access Token}
+         * Set-Cookie: refreshToken={Refresh Token}; ...
+         *
+         * 응답 본문:
+         * {
+         *   "success": true,
+         *   "code": "LOGIN_SUCCESS",
+         *   "message": "로그인에 성공했습니다.",
+         *   "data": null
+         * }
+         */
+    }
+
+    /**
+     * METHOD: 쿠키의 Refresh Token을 검증하고 새 Access Token을 전달합니다.
+     */
+    @PostMapping("/reissue")
+    public ResponseEntity<ApiResponse<Void>> reissue(
+            @CookieValue(name = "refreshToken", required = false)
+            String refreshToken
+    ) {
+        // 1. 쿠키로 받은 토큰을 검증하고 새 Access Token을 발급받습니다.
+        String accessToken = authService.reissue(refreshToken);
+
+        // 2. 새 Access Token을 Authorization 응답 헤더로 전달합니다.
+        return ResponseEntity
+                .ok()
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .body(ApiResponse.<Void>success(
+                        AuthSuccessCode.TOKEN_REISSUED,
+                        null
+                ));
+    }
+
+    /**
+     * METHOD: 인증된 회원의 Refresh Token 기록을 삭제하고 쿠키를 만료 시킴
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @AuthenticationPrincipal Long memberId //@AuthenticationPrincipal은 인증 정보에서 사용자를 꺼내줌
+    ) {
+        // 1. 현재 인증된 회원의 Refresh Token 기록을 모두 삭제
+        authService.logout(memberId);
+
+        // 2. 현재 클라이언트의 Refresh Token 쿠키를 만료 시킴
+        return ResponseEntity
+                .ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear())
+                .body(ApiResponse.<Void>success(
+                        AuthSuccessCode.LOGOUT_SUCCESS,
+                        null
+                ));
+    }
+
+
+    // CSRF
+    /**
+     * METHOD: 상태 변경 요청에 사용할 CSRF 토큰을 응답 헤더로 전달
+     */
+    @GetMapping("/csrf")
+    public ResponseEntity<Void> csrf(CsrfToken csrfToken) {
+        return ResponseEntity
+                .ok()
+                .cacheControl(CacheControl.noStore())
+                .header(csrfToken.getHeaderName(), csrfToken.getToken())
+                .build();
     }
 }

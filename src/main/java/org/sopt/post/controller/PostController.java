@@ -12,6 +12,7 @@ import org.sopt.post.service.PostService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 /**
  * CLASS: 게시글 HTTP 요청을 받아 Service에 위임하고 성공 응답을 반환합니다.
@@ -35,10 +36,23 @@ public class PostController implements PostApi {
      */
     @Override
     @PostMapping
-    public ResponseEntity<ApiResponse<PostIdResponse>> createPost(@RequestBody CreatePostRequest request) {
-        Long id = service.createPost(request.title(), request.content(), request.category(), request.memberId());
-        return ResponseEntity.created(URI.create("/api/v1/posts/" + id))
-                .body(ApiResponse.success(PostSuccessCode.POST_CREATED, new PostIdResponse(id)));
+    public ResponseEntity<ApiResponse<PostIdResponse>> createPost(
+            @RequestBody CreatePostRequest request,
+            @AuthenticationPrincipal Long memberId
+    ) {
+        Long id = service.createPost(
+                request.title(),
+                request.content(),
+                request.category(),
+                memberId
+        );
+
+        return ResponseEntity
+                .created(URI.create("/api/v1/posts/" + id))
+                .body(ApiResponse.success(
+                        PostSuccessCode.POST_CREATED,
+                        new PostIdResponse(id)
+                ));
     }
 
     /**
@@ -79,10 +93,16 @@ public class PostController implements PostApi {
     @PutMapping("/{postId}")
     public ResponseEntity<ApiResponse<PostIdResponse>> updatePost(
             @PathVariable("postId") long id,
-            @RequestBody UpdatePostRequest request
+            @RequestBody UpdatePostRequest request,
+            @AuthenticationPrincipal Long memberId
     ) {
-        service.updatePost(id, request.title(), request.content());
-        return ResponseEntity.ok(ApiResponse.success(PostSuccessCode.POST_UPDATED, new PostIdResponse(id)));
+        service.updatePost(id, request.title(), request.content(), memberId);
+
+        return ResponseEntity
+                .ok(ApiResponse.success(
+                        PostSuccessCode.POST_UPDATED,
+                        new PostIdResponse(id)
+                ));
 
     }
 
@@ -91,8 +111,16 @@ public class PostController implements PostApi {
      */
     @Override
     @DeleteMapping("/{postId}")
-    public ResponseEntity<ApiResponse<PostIdResponse>> deletePost(@PathVariable("postId") long id) {
-        service.deletePost(id);
-        return ResponseEntity.ok(ApiResponse.success(PostSuccessCode.POST_DELETED, new PostIdResponse(id)));
+    public ResponseEntity<ApiResponse<PostIdResponse>> deletePost(
+            @PathVariable("postId") long id,
+            @AuthenticationPrincipal Long memberId
+    ) {
+        service.deletePost(id, memberId);
+
+        return ResponseEntity
+                .ok(ApiResponse.success(
+                        PostSuccessCode.POST_DELETED,
+                        new PostIdResponse(id)
+                ));
     }
 }

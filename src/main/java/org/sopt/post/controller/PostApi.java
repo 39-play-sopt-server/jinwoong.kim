@@ -13,6 +13,7 @@ import org.sopt.post.dto.PostPageResponse;
 import org.sopt.post.dto.PostResponse;
 import org.sopt.post.dto.UpdatePostRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -27,7 +28,7 @@ public interface PostApi {
      */
     @Operation(
             summary = "게시글 생성",
-            description = "제목, 본문, 카테고리, 작성자 ID를 입력받아 게시글을 생성합니다."
+            description = "제목, 본문, 카테고리를 입력받고, 인증된 회원을 작성자로 게시글을 생성합니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "406", description = "Accept에서 JSON 응답을 허용하지 않음. 응답 본문 없음", content = @Content),
@@ -37,7 +38,10 @@ public interface PostApi {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DB 제약조건 충돌", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "예상하지 못한 서버 오류", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class)))
     })
-    ResponseEntity<ApiResponse<PostIdResponse>> createPost(CreatePostRequest request);
+    ResponseEntity<ApiResponse<PostIdResponse>> createPost(
+            @RequestBody CreatePostRequest request,
+            @AuthenticationPrincipal Long memberId
+    );
 
     /**
      * METHOD: 페이지 번호와 크기로 목록을 조회하는 API의 계약을 선언합니다.
@@ -86,9 +90,13 @@ public interface PostApi {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "게시글 ID 형식 오류, 제목 길이 초과 또는 잘못된 JSON", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 게시글", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DB 제약조건 충돌", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "예상하지 못한 서버 오류", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class)))
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "예상하지 못한 서버 오류", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "작성자가 아니거나 CSRF검증 실패", content = @Content),
     })
-    ResponseEntity<ApiResponse<PostIdResponse>> updatePost(@PathVariable("postId") long id, @RequestBody UpdatePostRequest request);
+    ResponseEntity<ApiResponse<PostIdResponse>> updatePost(
+            @PathVariable("postId") long id,
+            @RequestBody UpdatePostRequest request,
+            @AuthenticationPrincipal Long memberId);
 
     /**
      * METHOD: ID로 게시글을 삭제하는 API의 계약을 선언합니다.
@@ -103,7 +111,8 @@ public interface PostApi {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "게시글 ID 형식 오류", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 게시글", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "DB 제약조건 충돌", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "예상하지 못한 서버 오류", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class)))
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "예상하지 못한 서버 오류", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "작성자가 아니거나 CSRF검증 실패", content = @Content),
     })
-    ResponseEntity<ApiResponse<PostIdResponse>> deletePost(@PathVariable("postId") long id);
+    ResponseEntity<ApiResponse<PostIdResponse>> deletePost(@PathVariable("postId") long id, @AuthenticationPrincipal Long memberId);
 }

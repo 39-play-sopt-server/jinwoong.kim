@@ -1,5 +1,9 @@
 package org.sopt.auth.service;
 
+import lombok.RequiredArgsConstructor;
+
+import org.sopt.auth.exception.AuthErrorCode;
+import org.sopt.auth.jwt.JwtProvider;
 import org.sopt.common.exception.BusinessException;
 import org.sopt.member.domain.Member;
 import org.sopt.member.dto.MemberResponse;
@@ -9,26 +13,28 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.sopt.auth.dto.TokenPair;
+import io.jsonwebtoken.Claims;
+import org.sopt.auth.domain.RefreshToken;
+import org.sopt.auth.repository.RefreshTokenRepository;
+
+import io.jsonwebtoken.JwtException;
+import java.time.Instant;
+
 /**
  * CLASS: 회원가입 시 입력 확인, 이메일 중복 검사, 비밀번호 해시 처리와 저장을 담당합니다.
  */
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class AuthService {
 
     private final MemberRepository members; // 예: 회원 조회와 저장에 사용하는 저장소
     private final PasswordEncoder passwordEncoder; // 예: PasswordConfig에서 등록한 BCrypt 구현체
 
-    /**
-     * CONSTRUCTOR: 회원 저장소와 비밀번호 해시 처리 객체를 생성자로 주입받습니다.
-     */
-    public AuthService(
-            MemberRepository members,
-            PasswordEncoder passwordEncoder
-    ) {
-        this.members = members;
-        this.passwordEncoder = passwordEncoder;
-    }
+    private final JwtProvider jwtProvider; // 로그인 성공 시 JWT를 발급하는 객체
+
+    private final RefreshTokenRepository refreshTokens; // 허용된 Refresh Token 정보를 저장하는 저장소
 
     /**
      * METHOD: 이메일 중복을 검사하고 비밀번호를 해시로 변환해 회원을 저장합니다.
@@ -68,5 +74,125 @@ public class AuthService {
 
         // 응답 DTO에는 회원 ID와 이름만 포함하므로 비밀번호 해시가 노출되지 않습니다.
         return MemberResponse.from(members.save(member));
+    }
+
+    /**
+     * METHOD: 이메일과 비밀번호를 확인하고 Access Token을 반환
+     * readOnly = true삭제 | 로그인에서 DB에 저장함 읽기 전용 X
+     */
+    public TokenPair login(String email, String password) {
+        // 1. 이메일과 비밀전호가 입력되었는지 확인
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
+        }
+
+        // 2. 이메일에 해당하는 회원이 없으면 로그인에 실패
+        Member member = members.findByEmail(email.trim())
+                .orElseThrow(() ->
+                        new BusinessException(AuthErrorCode.INVALID_CREDENTIALS));
+
+        // 3. 소셜 전용 회원의 비밀번호 로그인 차단 및 비밀번호 검증
+        if (member.getPassword() == null
+                || !passwordEncoder.matches(password, member.getPassword())) {
+            throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
+        }
+
+        return issueTokens(member);
+    }
+
+    /**
+     * METHOD: 소셜 인증으로 확인된 회원에게 우리 서비스 토큰 발급
+     */
+    public TokenPair loginSocial(Long memberId) {
+        Member member = members.findById(memberId)
+                .orElseThrow(() -> new BusinessException(AuthErrorCode.SOCIAL_LOGIN_FAILED));
+
+        return issueTokens(member);
+    }
+
+    /**
+     * METHOD: 일반·소셜 로그인 공통 토큰 발급과 Refresh Token 허용 기록 저장
+     */
+    private TokenPair issueTokens(Member member) {
+        // 현재 DB의 토큰 버전으로 두 토큰 발급
+        String accessToken = jwtProvider.createAccessToken(
+                member.getId(), member.getTokenVersion());
+        String refreshToken = jwtProvider.createRefreshToken(
+                member.getId(), member.getTokenVersion());
+
+        // Refresh Token에서 저장할 정보 추출
+        Claims claims = jwtProvider.getRefreshClaims(refreshToken);
+
+        RefreshToken savedToken = new RefreshToken(
+                claims.getId(),
+                member.getId(),
+                claims.getExpiration().toInstant()
+        );
+
+        // 서버가 허용한 Refresh Token으로 DB에 등록
+        refreshTokens.save(savedToken); // refreshTokens는 DB저장소 객체.
+
+        // 저장 성공 후 두 토큰 반환
+        return new TokenPair(accessToken, refreshToken);
+    }
+
+    /**
+     * METHOD: Refresh Token과 저장 기록을 확인하고 새 Access Token을 발급합니다.
+     */
+    @Transactional(readOnly = true)
+    public String reissue(String refreshToken) {
+        Claims claims;
+        Long memberId;
+        String tokenId;
+
+        // 1. 서명, 만료, 토큰 종류와 필수 식별 정보를 확인
+        try {
+            claims = jwtProvider.getRefreshClaims(refreshToken);
+            memberId = Long.valueOf(claims.getSubject());
+            tokenId = claims.getId();
+
+            if (tokenId == null || tokenId.isBlank()) {
+                throw new IllegalArgumentException("토큰 식별자가 없습니다.");
+            }
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        // 2. 서버가 허용한 토큰 기록이 있는지 확인
+        RefreshToken savedToken = refreshTokens.findById(tokenId)
+                .orElseThrow(() ->
+                        new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+
+        // 3. 저장된 회원 정보와 만료 시각을 확인
+        if (!savedToken.getMemberId().equals(memberId)
+                || !savedToken.getExpiresAt().isAfter(Instant.now())) {
+            throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        // 4. 회원이 존재하고 Refresh Token의 버전이 현재 버전과 같은지 확인
+        Member member = members.findById(memberId)
+                .orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+        Long tokenVersion = claims.get("tokenVersion", Long.class);
+
+        if (tokenVersion == null
+                || tokenVersion.longValue() != member.getTokenVersion()) {
+            throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        // 5. 현재 회원의 토큰 버전으로 새 Access Token을 발급
+        return jwtProvider.createAccessToken(
+                member.getId(), member.getTokenVersion()
+        );
+    }
+
+    /**
+     * METHOD: 해당 회원의 모든 Refresh Token 기록을 삭제해 재발급을 차단
+     */
+    public void logout(Long memberId) {
+        // 1. 기존 Access Token과 Refresh Token의 버전을 무효화
+        members.increamentTokenVersion(memberId);
+
+        // 2. 해당 회원의 Refresh Token허용 기록을 모두 삭제
+        refreshTokens.deleteByMemberId(memberId);
     }
 }

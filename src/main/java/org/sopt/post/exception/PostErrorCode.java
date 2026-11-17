@@ -7,7 +7,10 @@ import org.springframework.http.HttpStatus;
  * ENUM: PostErrorCode의 HTTP 상태·식별 코드·메시지를 관리합니다.
  */
 public enum PostErrorCode implements ErrorCode {
-    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 게시글입니다.");
+
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 게시글입니다."),
+
+    POST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "게시글 작성자만 수정하거나 삭제할 수 있습니다.");
 
     private final HttpStatus status; // 예: 성공 또는 실패의 HTTP 상태
     private final String message; // 예: 사용자에게 전달할 기본 메시지
