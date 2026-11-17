@@ -27,6 +27,14 @@ public class Member extends BaseEntity {
     @Column(nullable = false, columnDefinition = "BIGINT DEFAULT 0")
     private long tokenVersion = 0L; // 기존 토큰의 사용 가능 여부를 판단하는 회원별 버전
 
+    @Getter
+    @Enumerated(EnumType.STRING)
+    @Column(
+            nullable = false,
+            length = 20,
+            columnDefinition = "VARCHAR(20) DEFAULT 'ROLE_USER'"
+    )
+    private MemberRole role = MemberRole.ROLE_USER; // 회원가입 시 기본 권한
 
     /**
      * CONSTRUCTOR: JPA가 회원 객체를 생성할 수 있도록 기본 생성자 제공
