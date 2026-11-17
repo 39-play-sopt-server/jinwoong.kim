@@ -2,6 +2,7 @@ package org.sopt.member.domain;
 
 import jakarta.persistence.*;
 import org.sopt.common.domain.BaseEntity;
+import lombok.Getter;
 
 /**
  * CLASS: 회원 식별자, 이름, 이메일과 비밀번호 해시를 저장하고 가입 정보의 입력 규칙을 검증합니다.
@@ -21,6 +22,12 @@ public class Member extends BaseEntity {
 
     @Column(nullable = false, length = 255)
     private String password; // 원문이 아닌 BCrypt 비밀번호 해시
+
+    @Getter
+    @Column(nullable = false, columnDefinition = "BIGINT DEFAULT 0")
+    private long tokenVersion = 0L; // 기존 토큰의 사용 가능 여부를 판단하는 회원별 버전
+
+
     /**
      * CONSTRUCTOR: JPA가 회원 객체를 생성할 수 있도록 기본 생성자 제공
      */
