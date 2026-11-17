@@ -91,18 +91,36 @@ public class AuthService {
                 .orElseThrow(() ->
                         new BusinessException(AuthErrorCode.INVALID_CREDENTIALS));
 
-        // 3. 입력한 원문 비밀번호와 저장된 해시가 일치하는지 확인
-        if (!passwordEncoder.matches(password, member.getPassword())) {
+        // 3. 소셜 전용 회원의 비밀번호 로그인 차단 및 비밀번호 검증
+        if (member.getPassword() == null
+                || !passwordEncoder.matches(password, member.getPassword())) {
             throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
-        // 4. 인증에 성공한 회원의 ID로 Access Token을 발급, 토큰 버전을 JWT에 기록
+        return issueTokens(member);
+    }
+
+    /**
+     * METHOD: 소셜 인증으로 확인된 회원에게 우리 서비스 토큰 발급
+     */
+    public TokenPair loginSocial(Long memberId) {
+        Member member = members.findById(memberId)
+                .orElseThrow(() -> new BusinessException(AuthErrorCode.SOCIAL_LOGIN_FAILED));
+
+        return issueTokens(member);
+    }
+
+    /**
+     * METHOD: 일반·소셜 로그인 공통 토큰 발급과 Refresh Token 허용 기록 저장
+     */
+    private TokenPair issueTokens(Member member) {
+        // 현재 DB의 토큰 버전으로 두 토큰 발급
         String accessToken = jwtProvider.createAccessToken(
                 member.getId(), member.getTokenVersion());
         String refreshToken = jwtProvider.createRefreshToken(
                 member.getId(), member.getTokenVersion());
 
-        // 5. Refresh Token을 검증하고 저장할 정보를 꺼냄
+        // Refresh Token에서 저장할 정보 추출
         Claims claims = jwtProvider.getRefreshClaims(refreshToken);
 
         RefreshToken savedToken = new RefreshToken(
@@ -111,10 +129,10 @@ public class AuthService {
                 claims.getExpiration().toInstant()
         );
 
-        // 6. 서버가 허용한 Refresh Token으로 DB에 등록
+        // 서버가 허용한 Refresh Token으로 DB에 등록
         refreshTokens.save(savedToken); // refreshTokens는 DB저장소 객체.
 
-        // 7. 저장에 성공하면 두 토큰을 Controller에 전달
+        // 저장 성공 후 두 토큰 반환
         return new TokenPair(accessToken, refreshToken);
     }
 
