@@ -13,6 +13,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.net.URI;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -42,7 +44,9 @@ class Assignment3ApiTest {
 
     private final List<Long> memberIds = new ArrayList<>(); // 예: 테스트 후 정리할 회원 ID
     private final String prefix = "api-" + UUID.randomUUID(); // 예: 다른 실행과 구분할 제목
-    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    private final HttpClient client = HttpClient.newBuilder()
+            .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+            .connectTimeout(Duration.ofSeconds(5)).build();
 
     /**
      * METHOD: 개발 DB에 테스트 데이터를 쓰지 않도록 실제 연결된 DB를 확인합니다.
@@ -65,6 +69,8 @@ class Assignment3ApiTest {
             jdbc.update("DELETE FROM post WHERE member_id = ?", id);
         }
         for (Long id : memberIds) {
+            jdbc.update("DELETE FROM refresh_token WHERE member_id = ?", id);
+            jdbc.update("DELETE FROM social_account WHERE member_id = ?", id);
             jdbc.update("DELETE FROM member WHERE id = ?", id);
         }
     }
@@ -76,8 +82,10 @@ class Assignment3ApiTest {
     void memberCreationAndDeletion() throws Exception {
         long memberId = createMember("  API 회원  ");
         assertEquals("API 회원", jdbc.queryForObject("SELECT name FROM member WHERE id = ?", String.class, memberId));
-        assertStatus(200, request("DELETE", "/members/" + memberId, null));
-        assertStatus(404, request("DELETE", "/members/" + memberId, null));
+        useMember(memberId);
+        assertStatus(200, request("DELETE", "/members/me", null));
+        assertEquals(401, request("DELETE", "/members/me", null).statusCode());
+        assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM member WHERE id = ?", Long.class, memberId));
     }
 
     /**
@@ -164,15 +172,15 @@ class Assignment3ApiTest {
         long reader = createMember("좋아요 회원");
         long nonLiker = createMember("누르지 않은 회원");
         long postId = createPost(author, prefix + "-likes", "GENERAL");
-        String path = "/posts/" + postId + "/likes/" + reader;
-        assertStatus(200, request("PUT", path, null));
-        assertStatus(200, request("PUT", path, null));
-        var missing = assertStatus(404, request("DELETE", "/posts/" + postId + "/likes/" + nonLiker, null));
+        String path = "/posts/" + postId + "/likes";
+        assertStatus(200, requestAs(reader, "PUT", path, null));
+        assertStatus(200, requestAs(reader, "PUT", path, null));
+        var missing = assertStatus(404, requestAs(nonLiker, "DELETE", "/posts/" + postId + "/likes", null));
         assertEquals("좋아요를 누른 흔적이 없습니다.", missing.read("$.message"));
         var detail = assertStatus(200, request("GET", "/posts/" + postId, null));
         assertEquals(1L, number(detail, "$.data.likeCount"));
-        assertStatus(200, request("DELETE", path, null));
-        assertStatus(404, request("DELETE", path, null));
+        assertStatus(200, requestAs(reader, "DELETE", path, null));
+        assertStatus(404, requestAs(reader, "DELETE", path, null));
         detail = assertStatus(200, request("GET", "/posts/" + postId, null));
         assertEquals(0L, number(detail, "$.data.likeCount"));
     }
@@ -185,11 +193,11 @@ class Assignment3ApiTest {
         long author = createMember("탈퇴 작성자");
         long reader = createMember("좋아요 독자");
         long postId = createPost(author, prefix + "-delete", "GENERAL");
-        assertStatus(200, request("PUT", "/posts/" + postId + "/likes/" + reader, null));
-        assertStatus(409, request("DELETE", "/members/" + author, null));
+        assertStatus(200, requestAs(reader, "PUT", "/posts/" + postId + "/likes", null));
+        assertStatus(409, requestAs(author, "DELETE", "/members/me", null));
         assertStatus(200, request("DELETE", "/posts/" + postId, null));
         assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM post_like WHERE post_id = ?", Long.class, postId));
-        assertStatus(200, request("DELETE", "/members/" + author, null));
+        assertStatus(200, requestAs(author, "DELETE", "/members/me", null));
     }
 
     /**
@@ -202,9 +210,8 @@ class Assignment3ApiTest {
         assertStatus(400, request("POST", "/posts",
                 "{\"title\":\" \",\"content\":\"본문\",\"category\":\"GENERAL\",\"memberId\":" + author + "}"));
         assertStatus(400, request("POST", "/posts",
-                "{\"title\":\"제목\",\"content\":\"본문\",\"category\":\"GENERAL\"}"));
-        assertStatus(404, request("POST", "/posts",
-                "{\"title\":\"제목\",\"content\":\"본문\",\"category\":\"GENERAL\",\"memberId\":9223372036854775807}"));
+                "{\"title\":\"제목\",\"content\":\"본문\"}"));
+        assertStatus(404, request("GET", "/posts/9223372036854775807", null));
         assertStatus(400, request("GET", "/posts?page=-1", null));
         assertStatus(400, request("GET", "/posts?size=0", null));
         assertStatus(400, request("GET", "/posts?size=101", null));
@@ -225,7 +232,7 @@ class Assignment3ApiTest {
         assertEquals("INVALID_REQUEST_BODY", badJson.read("$.code"));
 
         long member = createMember("메서드 확인 회원");
-        var methodResponse = request("PATCH", "/members/" + member, null);
+        var methodResponse = request("PATCH", "/members/me", null);
         var wrongMethod = assertStatus(405, methodResponse);
         assertEquals("METHOD_NOT_ALLOWED", wrongMethod.read("$.code"));
         assertTrue(methodResponse.headers().firstValue("Allow").orElseThrow().contains("DELETE"));
@@ -233,6 +240,7 @@ class Assignment3ApiTest {
         var unsupported = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/auth/signup"))
                 .timeout(Duration.ofSeconds(20))
                 .header("Content-Type", "text/plain")
+                .header("X-XSRF-TOKEN", csrfToken())
                 .header("Authorization", "Bearer " + accessToken)
                 .POST(HttpRequest.BodyPublishers.ofString("plain text"))
                 .build();
@@ -246,10 +254,12 @@ class Assignment3ApiTest {
     @Test
     void unsupportedAcceptDoesNotCreateResources() throws Exception {
         long author = createMember("Accept 테스트 회원");
+        useMember(author);
         String title = prefix + "-rejected-post";
         var postRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/posts"))
                 .timeout(Duration.ofSeconds(20))
                 .header("Accept", "text/plain").header("Content-Type", "application/json")
+                .header("X-XSRF-TOKEN", csrfToken())
                 .header("Authorization", "Bearer " + accessToken)
                 .POST(HttpRequest.BodyPublishers.ofString("{\"title\":\"" + title
                         + "\",\"content\":\"본문\",\"category\":\"GENERAL\",\"memberId\":" + author + "}"))
@@ -266,12 +276,12 @@ class Assignment3ApiTest {
         long author = createMember("좋아요 글 작성자");
         long reader = createMember("좋아요만 가진 회원");
         long postId = createPost(author, prefix + "-withdraw", "GENERAL");
-        String likePath = "/posts/" + postId + "/likes/" + reader;
-        assertStatus(200, request("PUT", likePath, null));
-        var rejected = assertStatus(409, request("DELETE", "/members/" + reader, null));
+        String likePath = "/posts/" + postId + "/likes";
+        assertStatus(200, requestAs(reader, "PUT", likePath, null));
+        var rejected = assertStatus(409, requestAs(reader, "DELETE", "/members/me", null));
         assertEquals("MEMBER_HAS_LIKES", rejected.read("$.code"));
-        assertStatus(200, request("DELETE", likePath, null));
-        assertStatus(200, request("DELETE", "/members/" + reader, null));
+        assertStatus(200, requestAs(reader, "DELETE", likePath, null));
+        assertStatus(200, requestAs(reader, "DELETE", "/members/me", null));
     }
 
     /**
@@ -285,14 +295,14 @@ class Assignment3ApiTest {
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
         assertEquals(200, response.statusCode(), response.body());
         var doc = JsonPath.parse(response.body());
-        assertEquals("MEMBER", doc.read("$.paths['/api/v1/members/{memberId}'].delete.tags[0]"));
+        assertEquals("MEMBER", doc.read("$.paths['/api/v1/members/me'].delete.tags[0]"));
         assertEquals("POST", doc.read("$.paths['/api/v1/posts'].post.tags[0]"));
-        assertEquals("LIKE", doc.read("$.paths['/api/v1/posts/{postId}/likes/{memberId}'].put.tags[0]"));
+        assertEquals("LIKE", doc.read("$.paths['/api/v1/posts/{postId}/likes'].put.tags[0]"));
         assertNotNull(doc.read("$.paths['/api/v1/auth/signup'].post"));
-        assertNotNull(doc.read("$.paths['/api/v1/members/{memberId}'].delete.responses['409']"));
+        assertNotNull(doc.read("$.paths['/api/v1/members/me'].delete.responses['409']"));
         assertNotNull(doc.read("$.paths['/api/v1/posts'].post.responses['201']"));
         assertNotNull(doc.read("$.paths['/api/v1/posts'].post.responses['406']"));
-        assertNotNull(doc.read("$.paths['/api/v1/posts/{postId}/likes/{memberId}'].delete.responses['404']"));
+        assertNotNull(doc.read("$.paths['/api/v1/posts/{postId}/likes'].delete.responses['404']"));
     }
 
     /**
@@ -317,6 +327,7 @@ class Assignment3ApiTest {
      * METHOD: 고유 제목의 게시글을 HTTP로 생성하고 DB에서 ID를 확인합니다.
      */
     private long createPost(long author, String title, String category) throws Exception {
+        useMember(author);
         var http = request("POST", "/posts", "{\"title\":\"" + title
                 + "\",\"content\":\"테스트 본문\",\"category\":\"" + category + "\",\"memberId\":" + author + "}");
         var body = assertStatus(201, http);
@@ -336,8 +347,43 @@ class Assignment3ApiTest {
         if (accessToken != null) {
             builder.header("Authorization", "Bearer " + accessToken);
         }
+        if (!method.equals("GET") && !method.equals("HEAD")) {
+            builder.header("X-XSRF-TOKEN", csrfToken());
+        }
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    /**
+     * METHOD: 현재 DB 버전으로 지정 회원의 테스트용 인증 정보 설정
+     */
+    private void useMember(long memberId) {
+        Long version = jdbc.queryForObject("SELECT token_version FROM member WHERE id = ?", Long.class, memberId);
+        accessToken = jwtProvider.createAccessToken(memberId, version);
+    }
+
+    /**
+     * METHOD: 특정 회원의 권한으로 요청 후 기존 테스트 인증 정보 복원
+     */
+    private HttpResponse<String> requestAs(long memberId, String method, String path, String body) throws Exception {
+        String previousToken = accessToken;
+        try {
+            useMember(memberId);
+            return request(method, path, body);
+        } finally {
+            accessToken = previousToken;
+        }
+    }
+
+    /**
+     * METHOD: 현재 쿠키에 대응하는 CSRF 응답 헤더 조회
+     */
+    private String csrfToken() throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/auth/csrf"))
+                .timeout(Duration.ofSeconds(20)).GET().build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode());
+        return response.headers().firstValue("X-XSRF-TOKEN").orElseThrow();
     }
 
     /**
