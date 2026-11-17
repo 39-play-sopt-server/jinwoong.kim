@@ -36,6 +36,9 @@ dependencies {
     // Lombok: 컴파일 시 생성자와 getter 등의 반복 코드 생성
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+
+    // GitHub OAuth2 로그인 지원
+    implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
 }
 
 test {
