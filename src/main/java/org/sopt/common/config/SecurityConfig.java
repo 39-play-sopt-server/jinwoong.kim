@@ -15,6 +15,8 @@ import org.sopt.auth.jwt.JwtAuthenticationFilter;
 import org.springframework.http.HttpMethod;
 import lombok.RequiredArgsConstructor;
 import org.sopt.member.repository.MemberRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 /**
  * CLASS: 경로별 인증 정책과 JWT 인증 필터의 실행 순서를 설정합니다.
@@ -31,18 +33,36 @@ public class SecurityConfig {
      * METHOD: 인증 허용 경로, 세션 정책, 인증 실패 응답과 JWT 필터를 구성합니다.
      */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            @Value("${app.cookie.secure:true}") boolean secure)
+            throws Exception {
+        // 세션 대신 쿠키에 CSRF 검증 기준값을 저장
+        CookieCsrfTokenRepository csrfRepository = new CookieCsrfTokenRepository();
+
+        csrfRepository.setCookieCustomizer(cookie -> cookie
+                .httpOnly(true)
+                .secure(secure)
+                .sameSite("Strict")
+                .path("/")
+        );
+
         return http
-                // 1. 인증 토큰을 브라우저가 자동 첨부하는 쿠키 대신 Authorization 헤더로 받는 현재 구조에 맞춰 CSRF 검사 비활성화
-                .csrf(AbstractHttpConfigurer::disable)
+                // 1. 상태 변경 요청에 쿠키 기반 CSRF 검증 적용
+                .csrf(csrf -> csrf.csrfTokenRepository(csrfRepository))
                 // 2. 기본 폼 로그인과 HTTP Basic 인증 비활성화
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 // 3. 인증 정보를 HTTP 세션에 저장하거나 세션에서 조회하지 않도록 설정
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 4. /api/v1/auth/** 전체는 인증 없이 허용하고 나머지 경로는 인증 필요
+                // 4. 공개 API와 인증이 필요한 API의 접근 정책 설정
                 .authorizeHttpRequests(auth -> auth
+                        // 로그인 전에도 CSRF 토큰 조회 허용
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/auth/csrf"
+                        ).permitAll()
                         // 회원가입, 로그인, 재발급, POST 요청만 Access Token 없이 접근 허용
                         .requestMatchers(
                                 HttpMethod.POST,
@@ -61,7 +81,13 @@ public class SecurityConfig {
                 // 5. 인증 없이 보호된 경로에 접근하면 401 응답
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(
-                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)
+                        )
+                        // CSRF 검증 실패나 접근 권한 부족은 403
+                        .accessDeniedHandler((request, response, exception) ->
+                                response.setStatus(HttpStatus.FORBIDDEN.value())
+                        )
+                )
                 // 6. UsernamePasswordAuthenticationFilter 앞에서 JWT 인증 필터 실행
                 .addFilterBefore(
                         new JwtAuthenticationFilter(members, jwtProvider),
