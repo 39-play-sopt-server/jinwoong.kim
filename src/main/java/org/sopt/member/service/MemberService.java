@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.sopt.auth.repository.RefreshTokenRepository;
 import java.util.List;
 import org.sopt.member.dto.MemberResponse;
+import org.sopt.auth.repository.SocialAccountRepository;
+
 
 /**
  * CLASS: 회원 탈퇴 조건 검증 및 삭제의 업무 흐름을 처리
@@ -25,6 +27,7 @@ public class MemberService {
     private final PostLikeRepository likes; // 예: 좋아요 존재 여부 확인 저장소
     private final PostRepository posts; // 예: Spring이 주입한 PostRepository
     private final RefreshTokenRepository refreshTokens; // 탈퇴 회원의 Refresh
+    private final SocialAccountRepository socialAccounts; // 탈퇴 회원의 소셜 계정 연결 삭제용 저장소
 
     /**
      * METHOD: 회원 존재 여부와 작성글을 검사하고 삭제를 DB에 반영
@@ -47,7 +50,10 @@ public class MemberService {
         // 4. 해당 회원의 Refresh Token 허용 기록을 모두 삭제
         refreshTokens.deleteByMemberId(memberId);
 
-        // 5. 회원을 삭제하고 DB에 반영
+        // 5. 회원 삭제 전 소셜 계정 연결 기록 정리
+        socialAccounts.deleteByMember_Id(memberId);
+
+        // 6. 회원을 삭제하고 DB에 반영
         members.delete(member);
         members.flush();
     }
