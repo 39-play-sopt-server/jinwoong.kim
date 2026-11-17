@@ -96,9 +96,11 @@ public class AuthService {
             throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
         }
 
-        // 4. 인증에 성공한 회원의 ID로 Access Token을 발급
-        String accessToken = jwtProvider.createAccessToken(member.getId());
-        String refreshToken = jwtProvider.createRefreshToken(member.getId());
+        // 4. 인증에 성공한 회원의 ID로 Access Token을 발급, 토큰 버전을 JWT에 기록
+        String accessToken = jwtProvider.createAccessToken(
+                member.getId(), member.getTokenVersion());
+        String refreshToken = jwtProvider.createRefreshToken(
+                member.getId(), member.getTokenVersion());
 
         // 5. Refresh Token을 검증하고 저장할 정보를 꺼냄
         Claims claims = jwtProvider.getRefreshClaims(refreshToken);
@@ -125,7 +127,7 @@ public class AuthService {
         Long memberId;
         String tokenId;
 
-        // 1. 서명, 만료, 토큰 종류와 필수 식별 정보를 확인합니다.
+        // 1. 서명, 만료, 토큰 종류와 필수 식별 정보를 확인
         try {
             claims = jwtProvider.getRefreshClaims(refreshToken);
             memberId = Long.valueOf(claims.getSubject());
@@ -138,23 +140,41 @@ public class AuthService {
             throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        // 2. 서버가 허용한 토큰 기록이 있는지 확인합니다.
+        // 2. 서버가 허용한 토큰 기록이 있는지 확인
         RefreshToken savedToken = refreshTokens.findById(tokenId)
                 .orElseThrow(() ->
                         new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN));
 
-        // 3. 저장된 회원 정보와 만료 시각을 확인합니다.
+        // 3. 저장된 회원 정보와 만료 시각을 확인
         if (!savedToken.getMemberId().equals(memberId)
                 || !savedToken.getExpiresAt().isAfter(Instant.now())) {
             throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        // 4. 탈퇴 등으로 회원이 사라졌다면 재발급을 거절합니다.
-        if (!members.existsById(memberId)) {
+        // 4. 회원이 존재하고 Refresh Token의 버전이 현재 버전과 같은지 확인
+        Member member = members.findById(memberId)
+                .orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+        Long tokenVersion = claims.get("tokenVersion", Long.class);
+
+        if (tokenVersion == null
+                || tokenVersion.longValue() != member.getTokenVersion()) {
             throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        // 5. 모든 검증을 통과한 회원에게 새 Access Token을 발급합니다.
-        return jwtProvider.createAccessToken(memberId);
+        // 5. 현재 회원의 토큰 버전으로 새 Access Token을 발급
+        return jwtProvider.createAccessToken(
+                member.getId(), member.getTokenVersion()
+        );
+    }
+
+    /**
+     * METHOD: 해당 회원의 모든 Refresh Token 기록을 삭제해 재발급을 차단
+     */
+    public void logout(Long memberId) {
+        // 1. 기존 Access Token과 Refresh Token의 버전을 무효화
+        members.increamentTokenVersion(memberId);
+
+        // 2. 해당 회원의 Refresh Token허용 기록을 모두 삭제
+        refreshTokens.deleteByMemberId(memberId);
     }
 }
