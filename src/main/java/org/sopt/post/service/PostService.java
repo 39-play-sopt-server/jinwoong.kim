@@ -15,6 +15,8 @@ import org.sopt.post.domain.Post;
 import org.sopt.post.dto.PostResponse;
 import org.sopt.post.exception.PostNotFoundException;
 import org.sopt.post.repository.PostRepository;
+import org.sopt.common.exception.BusinessException;
+import org.sopt.post.exception.PostErrorCode;
 
 import org.springframework.stereotype.Service;
 
@@ -91,26 +93,40 @@ public class PostService {
                 PostResponse.from(post, likes.countByPost_Id(post.getId()))));
     }
     /**
-     * METHOD: 게시글이 없으면 예외를 발생시키고, 있으면 객체의 검증 규칙에 따라 수정합니다.
+     * METHOD: 작석장 본인인지 확인한 뒤 게시글을 수정, 게시글이 없으면 예외를 발생시키고, 있으면 객체의 검증 규칙에 따라 수정합니다.
      */
     @Transactional
     public void updatePost(
             long id,
             String newTitle,
-            String newContent
+            String newContent,
+            Long memberId
     ) {
         Post post = repo.findById(id).orElseThrow(PostNotFoundException::new);
+        validateAuthor(post, memberId);
         post.update(newTitle, newContent);
     }
 
     /**
-     * METHOD: 저장소의 삭제 결과를 확인하고, 삭제할 게시글이 없으면 예외를 발생시킵니다.
+     * METHOD: 작성자 본인인지 확인한 뒤, 저장소의 삭제 결과를 확인하고, 삭제할 게시글이 없으면 예외를 발생시킵니다.
      */
     @Transactional //실습: 조회와 삭제를 하나의 트랜잭션으로
-    public void deletePost(long id) {
+    public void deletePost(long id, Long memberId) {
         Post post = repo.findForUpdate(id).orElseThrow(PostNotFoundException::new);
+
+        validateAuthor(post, memberId);
+
         likes.deleteByPost_Id(id);
         likes.flush();
         repo.delete(post);
+    }
+
+    /**
+     * METHOD: 요청한 회원이 게시글 작성자인지 확인
+     */
+    private void validateAuthor(Post post, Long memberId) {
+        if (!post.getMember().getId().equals(memberId)) {
+            throw new BusinessException(PostErrorCode.POST_ACCESS_DENIED);
+        }
     }
 }
