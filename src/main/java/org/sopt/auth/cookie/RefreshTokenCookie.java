@@ -38,4 +38,18 @@ public class RefreshTokenCookie {
                 .build()
                 .toString();
     }
+
+    /**
+     * METHOD: Refresh Token 쿠키를 즉시 만료시키는 헤더값을 설정
+     */
+    public String clear() {
+        return ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(secure)
+                .sameSite("Strict")
+                .path("/api/v1/auth")
+                .maxAge(Duration.ZERO)
+                .build()
+                .toString();
+    }
 }
