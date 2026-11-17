@@ -12,22 +12,20 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.sopt.auth.jwt.JwtProvider;
 import org.sopt.auth.jwt.JwtAuthenticationFilter;
+import org.springframework.http.HttpMethod;
+import lombok.RequiredArgsConstructor;
+import org.sopt.member.repository.MemberRepository;
 
 /**
  * CLASS: 경로별 인증 정책과 JWT 인증 필터의 실행 순서를 설정합니다.
  */
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider; // 예: Spring이 주입한 JWT 발급·검증 객체
-
-    /**
-     * CONSTRUCTOR: JWT 인증 필터에 전달할 JwtProvider를 생성자로 주입받습니다.
-     */
-    public SecurityConfig(JwtProvider jwtProvider) {
-        this.jwtProvider = jwtProvider;
-    }
+    private final MemberRepository members; // JWT 필터에서 회원과 토큰 버전을 확인할 저장소
 
     /**
      * METHOD: 인증 허용 경로, 세션 정책, 인증 실패 응답과 JWT 필터를 구성합니다.
@@ -45,8 +43,13 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // 4. /api/v1/auth/** 전체는 인증 없이 허용하고 나머지 경로는 인증 필요
                 .authorizeHttpRequests(auth -> auth
-                        // 회원가입 등 인증 API는 인증 없이 접근 허용
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        // 회원가입, 로그인, 재발급, POST 요청만 Access Token 없이 접근 허용
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/signup",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/reissue"
+                        ).permitAll()
                         // 배포 확인에 사용하는 Swagger 화면과 문서 접근 허용
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -61,7 +64,7 @@ public class SecurityConfig {
                                 new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 // 6. UsernamePasswordAuthenticationFilter 앞에서 JWT 인증 필터 실행
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtProvider),
+                        new JwtAuthenticationFilter(members, jwtProvider),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
