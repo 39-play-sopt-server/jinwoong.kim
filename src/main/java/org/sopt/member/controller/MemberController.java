@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.sopt.auth.cookie.RefreshTokenCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import java.util.List;
+import org.sopt.member.dto.MemberResponse;
 
 /**
  * CLASS: 회원 삭제 HTTP 요청을 Service에 위임하고 응답을 반환
@@ -39,6 +41,18 @@ public class MemberController implements MemberApi {
                         MemberSuccessCode.MEMBER_DELETED,
                         null
                 ));
+    }
+
+    /**
+     * METHOD: 관리자 전용 전체 회원 목록 조회 응답
+     */
+    @Override
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<MemberResponse>>> readAll() {
+        return ResponseEntity.ok(ApiResponse.success(
+                MemberSuccessCode.MEMBER_LIST_READ,
+                service.readAll()
+        ));
     }
 }
 
