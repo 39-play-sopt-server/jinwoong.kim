@@ -1,4 +1,12 @@
 spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: test-client
+            client-secret: test-secret
+            redirect-uri: "{baseUrl}/login/oauth2/code/github"
   datasource:
     url: jdbc:mysql://localhost:3306/assignment_test
     username: root
@@ -13,3 +21,8 @@ spring:
 # 테스트 전용 서명 키; 운영 환경의 JWT_SECRET 없이도 테스트 컨텍스트를 구성합니다.
 jwt:
   secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+
+# 임의 포트 HTTP 테스트에서만 쿠키 전송 허용; 운영 기본값은 Secure 유지
+app:
+  cookie:
+    secure: false
