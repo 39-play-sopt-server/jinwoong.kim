@@ -76,6 +76,9 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
+                        // 전체 회원 목록 조회는 관리자만 허용
+                        .requestMatchers(HttpMethod.GET, "/api/v1/members")
+                        .hasRole("ADMIN")
                         // 나머지 API는 인증 필요
                         .anyRequest().authenticated())
                 // 5. 인증 없이 보호된 경로에 접근하면 401 응답
