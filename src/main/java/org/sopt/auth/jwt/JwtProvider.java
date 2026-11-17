@@ -89,17 +89,19 @@ public class JwtProvider {
     }
 
     /**
-     * METHOD: 일반 API 접근에 사용할 AccessToken 을 생성
+     * METHOD: 회원 ID와 현재 토큰 버전을 담은 Access Token을 생성
      */
-    public String createAccessToken(Long memberId) {
-        return createToken(memberId, TokenType.ACCESS, accessTokenExpiration);
+    public String createAccessToken(Long memberId, long tokenVersion) {
+        return createToken(
+                memberId, TokenType.ACCESS, accessTokenExpiration, tokenVersion);
     }
 
     /**
      * METHOD: Access Token 재발급에 사용할 Refresh Token을 생성
      */
-    public String createRefreshToken(Long memberId) {
-        return createToken(memberId, TokenType.REFRESH, refreshTokenExpiration);
+    public String createRefreshToken(Long memberId, long tokenVersion) {
+        return createToken(
+                memberId, TokenType.REFRESH, refreshTokenExpiration, tokenVersion);
     }
 
     /**
@@ -108,17 +110,26 @@ public class JwtProvider {
     private String createToken(
             Long memberId,
             TokenType tokenType,
-            long expiration
+            long expiration,
+            long tokenVersion
     ) {
         Date now = new Date();
 
         return Jwts.builder()
                 .subject(String.valueOf(memberId)) // 토큰의 주인인 회원 ID
                 .claim("tokenType", tokenType.name()) // ACCESS또는 REFRESH
+                .claim("tokenVersion", tokenVersion) // 발급 당시 회원의 토큰 버전ㄷ
                 .id(UUID.randomUUID().toString()) // 개별 토큰의 고유 식별자
                 .issuedAt(now) // 발급 시각
                 .expiration(new Date(now.getTime() + expiration)) // 만료 시간
                 .signWith(secretKey) // 비밀키로 서명
                 .compact(); // JWT 문자열로 변환
+    }
+
+    /**
+     * METHOD: Access Token을 검증하고 클레임을 반환
+     */
+    public Claims getAccessClaims(String token) {
+        return parseClaims(token, TokenType.ACCESS);
     }
 }
