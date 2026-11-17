@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.sopt.member.domain.Member;
 import org.sopt.member.repository.MemberRepository;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
 /**
  * CLASS: 요청 헤더의 JWT를 검증하고 현재 요청의 인증 정보를 SecurityContext에 저장합니다.
  */
@@ -57,10 +59,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     throw new JwtException("무효화된 토큰입니다.");
                 }
 
-                // 5. 모든 검증을 통화하면 현재 요청의 인증 정보를 등록
+                // 5. 회원의 DB 권한을 Spring Security 권한 객체로 변환
+                SimpleGrantedAuthority authority = new SimpleGrantedAuthority(member.getRole().name());
+
+                // 6. 회원 ID와 권한을 담은 인증 정보 등록
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        member.getId(), null, List.of()
-                );
+                            member.getId(),
+                            null,
+                            List.of(authority)
+                    );
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
             } catch (JwtException | IllegalArgumentException e) {
